@@ -1,0 +1,22 @@
+# Secrets
+.env
+*.env
+secrets.env
+
+# Données volumineuses (hors dépôt)
+CheXpert/
+*.csv
+data/
+datalake/
+
+# Modèles (hébergés sur Hugging Face)
+*.pth
+*.pt
+*.pt2
+modele/data/
+
+# Sorties et caches
+rapports/
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
