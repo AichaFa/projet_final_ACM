@@ -1,0 +1,7 @@
+evidently==0.7.21
+pandas
+numpy
+sqlalchemy
+psycopg2-binary
+python-dotenv
+huggingface_hub
