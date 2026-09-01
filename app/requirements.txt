@@ -1,0 +1,3 @@
+requests    # Permet d'envoyer la requête HTTP vers l'API de prédiction
+Pillow      # Ouvre et prépare l'image (la radiographie déposée)
+spaces      # Requis par les Spaces gratuits ZeroGPU (fournit @spaces.GPU)
