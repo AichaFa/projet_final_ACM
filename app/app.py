@@ -1,8 +1,7 @@
 # ============================================================================
-# Auditeur de Cohérence Médicale - Application AUTONOME (Gradio) + interface
-# ----------------------------------------------------------------------------
-# Charge les encodeurs BioViL-T PUBLICS et calcule la cohérence localement
-# (par similarité). Aucune dépendance à une API externe. Interface soignée.
+# Auditeur de Cohérence Médicale - Application AUTONOME (Gradio)
+# Thème : fond noir, éléments bleus, textes blancs.
+# Charge les encodeurs BioViL-T PUBLICS et calcule la cohérence localement.
 # ============================================================================
 
 import math
@@ -36,25 +35,25 @@ text_model.eval()
 
 ICONE_OK = (
     "<svg width='26' height='26' viewBox='0 0 24 24' fill='none'>"
-    "<circle cx='12' cy='12' r='11' fill='#34a853'/>"
-    "<path d='M7 12.5l3 3 7-7' stroke='white' stroke-width='2.2' "
+    "<circle cx='12' cy='12' r='11' fill='#3ddc84'/>"
+    "<path d='M7 12.5l3 3 7-7' stroke='#0e2447' stroke-width='2.2' "
     "fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>"
 )
 ICONE_NON = (
     "<svg width='26' height='26' viewBox='0 0 24 24' fill='none'>"
-    "<circle cx='12' cy='12' r='11' fill='#ea4335'/>"
-    "<path d='M8 8l8 8M16 8l-8 8' stroke='white' stroke-width='2.2' "
+    "<circle cx='12' cy='12' r='11' fill='#ff6b6b'/>"
+    "<path d='M8 8l8 8M16 8l-8 8' stroke='#0e2447' stroke-width='2.2' "
     "stroke-linecap='round'/></svg>"
 )
 
 
-def _carte(couleur_fond, couleur_bord, icone, titre, detail):
+def _carte(accent, icone, titre, detail):
     return (
-        f"<div style='background:{couleur_fond}; border:1px solid {couleur_bord}; "
-        f"border-radius:14px; padding:18px 20px; display:flex; align-items:center; "
-        f"gap:14px;'>{icone}<div><div style='font-size:20px; font-weight:700; "
-        f"color:{couleur_bord};'>{titre}</div>"
-        f"<div style='color:#41506b; margin-top:2px;'>{detail}</div></div></div>"
+        f"<div style='background:#0e2447; border-left:6px solid {accent}; "
+        f"border-radius:12px; padding:18px 20px; display:flex; align-items:center; "
+        f"gap:14px; margin-top:8px;'>{icone}"
+        f"<div><div style='font-size:20px; font-weight:700; color:{accent};'>{titre}</div>"
+        f"<div style='color:#ffffff; margin-top:2px;'>{detail}</div></div></div>"
     )
 
 
@@ -62,8 +61,7 @@ def _carte(couleur_fond, couleur_bord, icone, titre, detail):
 def verifier(image_path, texte):
     if image_path is None or not texte or not texte.strip():
         return _carte(
-            "#fef7e0",
-            "#f0a500",
+            "#f5c542",
             "",
             "Informations manquantes",
             "Merci de fournir une radiographie ET un compte rendu.",
@@ -114,20 +112,18 @@ def verifier(image_path, texte):
             similarite = torch.mm(image_embedding, text_embedding.t()).item()
             proba = 1 / (1 + math.exp(-similarite * 4))
     except Exception as e:
-        return _carte("#fce8e6", "#ea4335", "", "Erreur lors de l'analyse", str(e))
+        return _carte("#ff6b6b", "", "Erreur lors de l'analyse", str(e))
 
     if proba >= SEUIL:
         return _carte(
-            "#e6f4ea",
-            "#34a853",
+            "#3ddc84",
             ICONE_OK,
             "COHÉRENT",
             f"Le compte rendu correspond à la radiographie. "
             f"Score de confiance : {proba:.3f}",
         )
     return _carte(
-        "#fce8e6",
-        "#ea4335",
+        "#ff6b6b",
         ICONE_NON,
         "INCOHÉRENT",
         f"Le compte rendu ne correspond pas à la radiographie. "
@@ -140,39 +136,47 @@ def effacer():
 
 
 CSS = """
-html, body, .gradio-container, .app {
-  background: linear-gradient(135deg, #0b1e3f 0%, #16306b 55%, #2e5fa3 100%) !important;
+html, body, gradio-app, .gradio-container, .app, .main, .wrap, .contain, .fillable {
+  background: #000000 !important; background-image: none !important;
 }
 .gradio-container {
   max-width: 1400px !important;
   width: 95% !important;
   margin: 0 auto !important;
+  color: #ffffff !important;
+}
+.gradio-container label, .gradio-container .prose, .gradio-container .prose *,
+.gradio-container span, .gradio-container p,
+.gradio-container h1, .gradio-container h2, .gradio-container h3 {
+  color: #ffffff !important;
 }
 #entete {
   background: linear-gradient(135deg, #16306b, #2e6bb0);
-  color: white; padding: 18px 26px; border-radius: 16px; margin-bottom: 10px;
-  box-shadow: 0 6px 18px rgba(0,0,0,0.25); text-align: center;
+  padding: 18px 26px; border-radius: 16px; margin-bottom: 12px;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.6); text-align: center;
 }
-#entete h1 { margin: 0; font-size: 27px; }
-#entete p { margin: 6px 0 0 0; opacity: 0.92; }
+#entete h1 { margin: 0; font-size: 27px; color: #ffffff !important; }
+#entete p { margin: 6px 0 0 0; color: #ffffff !important; opacity: 0.95; }
 #carte_blanche { background: transparent !important; border: none !important; padding: 6px 0 !important; }
-.col-image {
-  background: transparent !important; border: none !important; padding: 6px !important;
-}
-.col-texte {
-  background: transparent !important; border: none !important; padding: 6px !important;
+.col-image, .col-texte {
+  background: #0e2447 !important; border: 1px solid #1e3f6f !important;
+  border-radius: 12px; padding: 12px;
 }
 #ligne_entrees { flex-wrap: nowrap !important; gap: 14px !important; }
+.gradio-container textarea, .gradio-container input[type=text] {
+  background: #0b1e3f !important; color: #ffffff !important;
+  border: 1px solid #24457a !important;
+}
 #btn_verifier button, #btn_verifier {
   background: #2e8bd8 !important; color: #ffffff !important;
   border: none !important; font-weight: 600 !important;
 }
 #btn_verifier button:hover { background: #4a9fe0 !important; }
 #btn_effacer button, #btn_effacer {
-  background: #e7ecf5 !important; color: #16306b !important;
-  border: 1px solid #cdd9ef !important;
+  background: #16306b !important; color: #ffffff !important;
+  border: 1px solid #2e6bb0 !important;
 }
-#pied { color: #cdd6ea; font-size: 12px; text-align: center; margin-top: 8px; }
+#pied { color: #9fb3d6; font-size: 12px; text-align: center; margin-top: 10px; }
 """
 
 with gr.Blocks(css=CSS, title="Auditeur de Cohérence Médicale") as demo:
