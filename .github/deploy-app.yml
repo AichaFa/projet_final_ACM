@@ -1,11 +1,3 @@
-# ============================================================================
-# Déploiement de l'App vers Hugging Face - MANUEL et CONTRÔLÉ
-# ----------------------------------------------------------------------------
-# Ne se déclenche QUE sur action manuelle (workflow_dispatch) : c'est TOI qui
-# décides de déployer, après avoir vérifié que les tests sont verts.
-# Avant d'envoyer, il re-vérifie le test de l'app (garde-fou).
-# ============================================================================
-
 name: Déploiement App (manuel)
 
 on:
