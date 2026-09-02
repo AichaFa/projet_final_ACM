@@ -147,7 +147,7 @@ CSS = """
 }
 #entete {
   background: linear-gradient(135deg, #16306b, #2e6bb0);
-  color: white; padding: 24px 28px; border-radius: 16px; margin-bottom: 10px;
+  color: white; padding: 18px 26px; border-radius: 16px; margin-bottom: 10px;
   box-shadow: 0 6px 18px rgba(0,0,0,0.25); text-align: center;
 }
 #entete h1 { margin: 0; font-size: 27px; }
@@ -159,6 +159,7 @@ CSS = """
 .col-texte {
   background: #eef7f1; border: 1px solid #cfe6d8; border-radius: 12px; padding: 12px;
 }
+#ligne_entrees { flex-wrap: nowrap !important; gap: 14px !important; }
 #btn_verifier button, #btn_verifier {
   background: #16306b !important; color: #ffffff !important;
   border: none !important; font-weight: 600 !important;
@@ -178,13 +179,13 @@ with gr.Blocks(css=CSS, title="Auditeur de Cohérence Médicale") as demo:
         "radiographie thoracique.</p></div>"
     )
     with gr.Group(elem_id="carte_blanche"):
-        with gr.Row():
-            with gr.Column(elem_classes="col-image"):
+        with gr.Row(elem_id="ligne_entrees", equal_height=True):
+            with gr.Column(elem_classes="col-image", min_width=280):
                 image_in = gr.Image(
-                    label="Radiographie thoracique", type="filepath", height=340
+                    label="Radiographie thoracique", type="filepath", height=300
                 )
-            with gr.Column(elem_classes="col-texte"):
-                texte_in = gr.Textbox(label="Compte rendu radiologique", lines=14)
+            with gr.Column(elem_classes="col-texte", min_width=280):
+                texte_in = gr.Textbox(label="Compte rendu radiologique", lines=11)
         with gr.Row():
             bouton = gr.Button(
                 "Lancer la vérification", elem_id="btn_verifier", scale=3
