@@ -140,8 +140,10 @@ def effacer():
 
 
 CSS = """
-.gradio-container {
+html, body, .gradio-container, .app {
   background: linear-gradient(135deg, #0b1e3f 0%, #16306b 55%, #2e5fa3 100%) !important;
+}
+.gradio-container {
   max-width: 1400px !important;
   width: 95% !important;
   margin: 0 auto !important;
@@ -153,19 +155,19 @@ CSS = """
 }
 #entete h1 { margin: 0; font-size: 27px; }
 #entete p { margin: 6px 0 0 0; opacity: 0.92; }
-#carte_blanche { background: white; border-radius: 16px; padding: 16px; }
+#carte_blanche { background: transparent !important; border: none !important; padding: 6px 0 !important; }
 .col-image {
-  background: #eaf1fb; border: 1px solid #cdd9ef; border-radius: 12px; padding: 12px;
+  background: transparent !important; border: none !important; padding: 6px !important;
 }
 .col-texte {
-  background: #eef7f1; border: 1px solid #cfe6d8; border-radius: 12px; padding: 12px;
+  background: transparent !important; border: none !important; padding: 6px !important;
 }
 #ligne_entrees { flex-wrap: nowrap !important; gap: 14px !important; }
 #btn_verifier button, #btn_verifier {
-  background: #16306b !important; color: #ffffff !important;
+  background: #2e8bd8 !important; color: #ffffff !important;
   border: none !important; font-weight: 600 !important;
 }
-#btn_verifier button:hover { background: #1f4488 !important; }
+#btn_verifier button:hover { background: #4a9fe0 !important; }
 #btn_effacer button, #btn_effacer {
   background: #e7ecf5 !important; color: #16306b !important;
   border: 1px solid #cdd9ef !important;
