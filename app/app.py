@@ -177,7 +177,11 @@ html, body, gradio-app, .gradio-container, .app, .main, .wrap, .contain, .fillab
 #carte_blanche label {
   background: #2f4bf0 !important; color: #ffffff !important;
   border-radius: 8px !important; font-weight: 600 !important;
+  display: inline-block !important; width: auto !important;
+  max-width: max-content !important; padding: 4px 12px !important;
+  margin: 6px 0 4px 6px !important; box-shadow: none !important;
 }
+#carte_blanche .label-wrap { width: auto !important; background: transparent !important; }
 
 #ligne_entrees { flex-wrap: nowrap !important; gap: 16px !important; }
 
