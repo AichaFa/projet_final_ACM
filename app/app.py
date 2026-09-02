@@ -65,7 +65,7 @@ def verifier(image_path, texte):
     # Appel de l'API (le moteur)
     try:
         reponse = get_client().predict(
-            handle_file(image_path), texte, api_name="/predict"
+            image_path=handle_file(image_path), texte=texte, api_name="/predire"
         )
     except Exception:
         return _carte(
