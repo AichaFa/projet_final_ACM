@@ -1,0 +1,61 @@
+# ============================================================================
+# CI - API  (dépôt unique projet_final_ACM)
+# ----------------------------------------------------------------------------
+# Se déclenche uniquement quand le dossier api/ change (ou ce fichier).
+# Étapes : style (black) + construction de l'image Docker + tests DANS le
+# conteneur (dont le test image + texte) + alerte Slack en cas d'échec.
+# ============================================================================
+
+name: CI - API
+
+on:
+  push:
+    paths:
+      - "api/**"
+      - ".github/workflows/ci-api.yml"
+  pull_request:
+    paths:
+      - "api/**"
+      - ".github/workflows/ci-api.yml"
+  workflow_dispatch:
+
+jobs:
+  ci-api:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: api
+
+    steps:
+      - name: Récupérer le code
+        uses: actions/checkout@v4
+
+      - name: Installer Python 3.10
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Vérifier le style (black)
+        run: |
+          pip install black
+          black --check --diff . | tee black-report.txt
+
+      - name: Publier le rapport black
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rapport-black-api
+          path: api/black-report.txt
+
+      - name: Construire l'image Docker
+        run: docker build -t auditeur-api:ci .
+
+      - name: Lancer les tests dans le conteneur
+        run: docker run --rm auditeur-api:ci sh -c "pip install pytest && pytest -v"
+
+      - name: Alerte Slack si échec
+        if: failure()
+        run: |
+          curl -X POST -H 'Content-type: application/json' \
+            --data "{\"text\":\"CI API en échec : ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\"}" \
+            ${{ secrets.SLACK_WEBHOOK_URL }}
