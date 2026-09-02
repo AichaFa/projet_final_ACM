@@ -1,9 +1,8 @@
 # ============================================================================
-# Auditeur de Cohérence Médicale - Application AUTONOME (Gradio)
+# Auditeur de Cohérence Médicale - Application AUTONOME (Gradio) + interface
 # ----------------------------------------------------------------------------
-# Elle charge les encodeurs BioViL-T PUBLICS (image + texte) et calcule
-# elle-même la cohérence entre la radiographie et le compte rendu, par
-# similarité. Aucune dépendance à une API externe (fini les erreurs 503).
+# Charge les encodeurs BioViL-T PUBLICS et calcule la cohérence localement
+# (par similarité). Aucune dépendance à une API externe. Interface soignée.
 # ============================================================================
 
 import math
@@ -35,15 +34,44 @@ text_model = AutoModel.from_pretrained(
 text_model.eval()
 
 
+ICONE_OK = (
+    "<svg width='26' height='26' viewBox='0 0 24 24' fill='none'>"
+    "<circle cx='12' cy='12' r='11' fill='#34a853'/>"
+    "<path d='M7 12.5l3 3 7-7' stroke='white' stroke-width='2.2' "
+    "fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>"
+)
+ICONE_NON = (
+    "<svg width='26' height='26' viewBox='0 0 24 24' fill='none'>"
+    "<circle cx='12' cy='12' r='11' fill='#ea4335'/>"
+    "<path d='M8 8l8 8M16 8l-8 8' stroke='white' stroke-width='2.2' "
+    "stroke-linecap='round'/></svg>"
+)
+
+
+def _carte(couleur_fond, couleur_bord, icone, titre, detail):
+    return (
+        f"<div style='background:{couleur_fond}; border:1px solid {couleur_bord}; "
+        f"border-radius:14px; padding:18px 20px; display:flex; align-items:center; "
+        f"gap:14px;'>{icone}<div><div style='font-size:20px; font-weight:700; "
+        f"color:{couleur_bord};'>{titre}</div>"
+        f"<div style='color:#41506b; margin-top:2px;'>{detail}</div></div></div>"
+    )
+
+
 @spaces.GPU
 def verifier(image_path, texte):
     if image_path is None or not texte or not texte.strip():
-        return "Merci de fournir une radiographie ET un compte rendu."
+        return _carte(
+            "#fef7e0",
+            "#f0a500",
+            "",
+            "Informations manquantes",
+            "Merci de fournir une radiographie ET un compte rendu.",
+        )
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
     try:
         with torch.no_grad():
-            # Embedding de l'image
             image_embedding = image_engine.get_projected_global_embedding(
                 Path(image_path)
             )
@@ -56,7 +84,6 @@ def verifier(image_path, texte):
                 dim=-1, keepdim=True
             )
 
-            # Embedding du texte
             inputs = tokenizer(
                 texte,
                 return_tensors="pt",
@@ -84,29 +111,80 @@ def verifier(image_path, texte):
                 text_embedding = text_embedding.unsqueeze(0)
             text_embedding = text_embedding / text_embedding.norm(dim=-1, keepdim=True)
 
-            # Similarité -> probabilité
             similarite = torch.mm(image_embedding, text_embedding.t()).item()
             proba = 1 / (1 + math.exp(-similarite * 4))
     except Exception as e:
-        return f"Erreur lors de l'analyse : {e}"
+        return _carte("#fce8e6", "#ea4335", "", "Erreur lors de l'analyse", str(e))
 
-    coherent = proba >= SEUIL
-    verdict = "COHÉRENT" if coherent else "INCOHÉRENT"
-    return f"Résultat : {verdict}  -  score de confiance : {proba:.3f}"
-
-
-with gr.Blocks(title="Auditeur de Cohérence Médicale") as demo:
-    gr.Markdown(
-        "## Auditeur de Cohérence Médicale\n"
-        "Vérifiez si un compte rendu radiologique correspond bien à sa "
-        "radiographie thoracique."
+    if proba >= SEUIL:
+        return _carte(
+            "#e6f4ea",
+            "#34a853",
+            ICONE_OK,
+            "COHÉRENT",
+            f"Le compte rendu correspond à la radiographie. "
+            f"Score de confiance : {proba:.3f}",
+        )
+    return _carte(
+        "#fce8e6",
+        "#ea4335",
+        ICONE_NON,
+        "INCOHÉRENT",
+        f"Le compte rendu ne correspond pas à la radiographie. "
+        f"Score de confiance : {proba:.3f}",
     )
-    with gr.Row():
-        image_in = gr.Image(label="Radiographie thoracique", type="filepath")
-        texte_in = gr.Textbox(label="Compte rendu radiologique", lines=12)
-    bouton = gr.Button("Lancer la vérification", variant="primary")
-    resultat = gr.Textbox(label="Résultat", interactive=False)
+
+
+def effacer():
+    return None, "", ""
+
+
+CSS = """
+.gradio-container {
+  background: linear-gradient(135deg, #0b1e3f 0%, #16306b 55%, #2e5fa3 100%) !important;
+  max-width: 1180px !important;
+}
+#entete {
+  background: linear-gradient(135deg, #16306b, #2e6bb0);
+  color: white; padding: 24px 28px; border-radius: 16px; margin-bottom: 10px;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.25);
+}
+#entete h1 { margin: 0; font-size: 27px; }
+#entete p { margin: 6px 0 0 0; opacity: 0.92; }
+#carte_blanche { background: white; border-radius: 16px; padding: 16px; }
+.gr-button-primary { background: #2e6bb0 !important; border: none !important; }
+#pied { color: #cdd6ea; font-size: 12px; text-align: center; margin-top: 8px; }
+"""
+
+with gr.Blocks(css=CSS, title="Auditeur de Cohérence Médicale") as demo:
+    gr.HTML(
+        "<div id='entete'><h1>Auditeur de Cohérence Médicale</h1>"
+        "<p>Vérifiez si un compte rendu clinique correspond bien à sa "
+        "radiographie thoracique.</p></div>"
+    )
+    with gr.Group(elem_id="carte_blanche"):
+        with gr.Row():
+            image_in = gr.Image(
+                label="Radiographie thoracique", type="filepath", height=340
+            )
+            texte_in = gr.Textbox(label="Compte rendu radiologique", lines=14)
+        with gr.Row():
+            bouton = gr.Button("Lancer la vérification", variant="primary", scale=3)
+            bouton_effacer = gr.Button("Effacer", scale=1)
+        resultat = gr.HTML()
+
+    with gr.Accordion("Comment ça marche ?", open=False):
+        gr.Markdown(
+            "L'outil encode la radiographie et le compte rendu avec le modèle "
+            "public BioViL-T, puis mesure leur correspondance. Un score élevé "
+            "indique une cohérence entre l'image et le texte. Outil d'aide, "
+            "ne remplaçant pas l'avis d'un professionnel de santé."
+        )
+
+    gr.HTML("<div id='pied'>Auditeur de Cohérence Médicale - démonstration</div>")
+
     bouton.click(verifier, inputs=[image_in, texte_in], outputs=resultat)
+    bouton_effacer.click(effacer, inputs=None, outputs=[image_in, texte_in, resultat])
 
 
 if __name__ == "__main__":
