@@ -1,35 +1,24 @@
 # ============================================================================
-# Auditeur de Cohérence Médicale - Application AUTONOME (Gradio)
-# Thème calqué sur la maquette : fond navy sombre, carte blanche, badges bleus,
-# bouton bleu franc, textes blancs. Score de confiance en pourcentage.
+# Auditeur de Cohérence Médicale - APP (interface) reliée à l'API
+# ----------------------------------------------------------------------------
+# L'App n'exécute PAS le modèle : elle appelle le Space API (Auditeur-API),
+# récupère "VERDICT|score" et l'affiche dans une belle carte.
 # ============================================================================
 
-import math
-from pathlib import Path
-
+from gradio_client import Client, handle_file
 import gradio as gr
-import torch
-import spaces
-from health_multimodal.image.inference_engine import ImageInferenceEngine
-from health_multimodal.image.model.pretrained import get_biovil_t_image_encoder
-from health_multimodal.image.data.transforms import (
-    create_chest_xray_transform_for_inference,
-)
-from transformers import AutoTokenizer, AutoModel
 
+API_SPACE = "AichaFaHugFace/Auditeur-API"
 SEUIL = 0.5
 
-image_encoder = get_biovil_t_image_encoder()
-transform = create_chest_xray_transform_for_inference(resize=512, center_crop_size=448)
-image_engine = ImageInferenceEngine(image_encoder, transform)
+_client = None
 
-tokenizer = AutoTokenizer.from_pretrained(
-    "microsoft/BiomedVLP-BioViL-T", trust_remote_code=True
-)
-text_model = AutoModel.from_pretrained(
-    "microsoft/BiomedVLP-BioViL-T", trust_remote_code=True
-)
-text_model.eval()
+
+def get_client():
+    global _client
+    if _client is None:
+        _client = Client(API_SPACE)
+    return _client
 
 
 ICONE_OK = (
@@ -56,7 +45,6 @@ def _carte(accent, icone, titre, detail):
     )
 
 
-@spaces.GPU
 def verifier(image_path, texte):
     if image_path is None or not texte or not texte.strip():
         return _carte(
@@ -65,56 +53,35 @@ def verifier(image_path, texte):
             "Informations manquantes",
             "Merci de fournir une radiographie ET un compte rendu.",
         )
-
-    device = "cuda" if torch.cuda.is_available() else "cpu"
+    # Appel de l'API (le moteur)
     try:
-        with torch.no_grad():
-            image_embedding = image_engine.get_projected_global_embedding(
-                Path(image_path)
-            )
-            if not isinstance(image_embedding, torch.Tensor):
-                image_embedding = torch.tensor(image_embedding)
-            image_embedding = image_embedding.to(device)
-            if image_embedding.ndim == 1:
-                image_embedding = image_embedding.unsqueeze(0)
-            image_embedding = image_embedding / image_embedding.norm(
-                dim=-1, keepdim=True
-            )
+        reponse = get_client().predict(
+            handle_file(image_path), texte, api_name="/predict"
+        )
+    except Exception:
+        return _carte(
+            "#e74c3c",
+            "",
+            "Erreur de l'API",
+            "L'API n'a pas répondu (Space en veille ?). Réessaie dans un instant.",
+        )
+    # Lecture de "VERDICT|score"
+    try:
+        verdict, score = str(reponse).split("|")
+        proba = float(score)
+    except Exception:
+        return _carte("#e74c3c", "", "Réponse inattendue", str(reponse))
 
-            inputs = tokenizer(
-                texte,
-                return_tensors="pt",
-                padding="max_length",
-                truncation=True,
-                max_length=512,
-            ).to(device)
-            text_model.to(device)
-            if hasattr(text_model, "get_projected_text_embeddings"):
-                text_embedding = text_model.get_projected_text_embeddings(
-                    input_ids=inputs["input_ids"],
-                    attention_mask=inputs["attention_mask"],
-                )
-            else:
-                outputs = text_model(
-                    input_ids=inputs["input_ids"],
-                    attention_mask=inputs["attention_mask"],
-                )
-                text_embedding = (
-                    outputs.pooler_output
-                    if hasattr(outputs, "pooler_output")
-                    else outputs[0][:, 0, :]
-                )
-            if text_embedding.ndim == 1:
-                text_embedding = text_embedding.unsqueeze(0)
-            text_embedding = text_embedding / text_embedding.norm(dim=-1, keepdim=True)
-
-            similarite = torch.mm(image_embedding, text_embedding.t()).item()
-            proba = 1 / (1 + math.exp(-similarite * 4))
-    except Exception as e:
-        return _carte("#e74c3c", "", "Erreur lors de l'analyse", str(e))
+    if verdict == "ERREUR":
+        return _carte(
+            "#e74c3c",
+            "",
+            "Erreur lors de l'analyse",
+            "Vérifie que l'image et le texte sont valides.",
+        )
 
     pourcentage = f"{proba * 100:.1f} %"
-    if proba >= SEUIL:
+    if verdict == "COHERENT":
         return _carte(
             "#2ecc71",
             ICONE_OK,
@@ -141,15 +108,11 @@ html, body, gradio-app, .gradio-container, .app, .main, .wrap, .contain, .fillab
   background-attachment: fixed !important;
 }
 .gradio-container {
-  max-width: 1400px !important;
-  width: 95% !important;
-  margin: 0 auto !important;
+  max-width: 1400px !important; width: 95% !important; margin: 0 auto !important;
   color: #ffffff !important;
 }
 .gradio-container .prose, .gradio-container .prose *,
-.gradio-container h1, .gradio-container h2, .gradio-container h3 {
-  color: #ffffff !important;
-}
+.gradio-container h1, .gradio-container h2, .gradio-container h3 { color: #ffffff !important; }
 #entete {
   background: linear-gradient(135deg, #16306b, #3a5bd0);
   padding: 22px 26px; border-radius: 18px; margin-bottom: 14px;
@@ -157,58 +120,42 @@ html, body, gradio-app, .gradio-container, .app, .main, .wrap, .contain, .fillab
 }
 #entete h1 { margin: 0; font-size: 28px; color: #ffffff !important; }
 #entete p { margin: 6px 0 0 0; color: #ffffff !important; opacity: 0.95; }
-
-/* Carte blanche derrière les deux panneaux */
 #carte_blanche {
-  background: #ffffff !important; border-radius: 18px !important; padding: 16px !important;
-  box-shadow: 0 8px 22px rgba(0,0,0,0.35);
+  background: #ffffff !important; border-radius: 18px !important;
+  padding: 18px !important; box-shadow: 0 8px 22px rgba(0,0,0,0.35);
 }
-.col-image, .col-texte { background: transparent !important; border: none !important; padding: 6px !important; }
-
-/* Panneaux internes (image + texte) en navy foncé */
-#carte_blanche .block, #carte_blanche textarea, #carte_blanche .image-container {
+#carte_blanche .gr-group, #carte_blanche .form, #carte_blanche .wrap,
+#carte_blanche .styler, #ligne_entrees, .col-image, .col-texte {
+  background: transparent !important; border: none !important;
+}
+#ligne_entrees { flex-wrap: nowrap !important; gap: 18px !important; }
+#carte_blanche .col-image .block, #carte_blanche .col-texte .block,
+#carte_blanche textarea {
   background: #16233c !important; border: 1px solid #26375c !important;
   border-radius: 12px !important; color: #ffffff !important;
 }
 #carte_blanche textarea::placeholder { color: #9fb0cc !important; }
-
-/* Libellés identiques : badges bleus pour les deux */
-/* Pastille bleue du libellé de l'image (overlay) */
-#carte_blanche .block-label {
-  background: #2f4bf0 !important; color: #ffffff !important;
-  border-radius: 8px !important; font-weight: 600 !important;
-  padding: 4px 12px !important; box-shadow: none !important;
+#carte_blanche .col-texte, #carte_blanche .col-texte .block,
+#carte_blanche .col-texte label, #carte_blanche .col-texte textarea {
+  width: 100% !important; max-width: 100% !important;
 }
-/* Zone de texte : pleine largeur pour écrire confortablement */
-#carte_blanche .col-texte,
-#carte_blanche .col-texte .block,
-#carte_blanche .col-texte label,
-#carte_blanche .col-texte textarea {
-  width: 100% !important; max-width: 100% !important; display: block !important;
-}
-/* Libellé du compte rendu en pastille bleue, sans réduire la zone */
+#carte_blanche .col-image label, #carte_blanche .col-image .block-label,
 #carte_blanche .col-texte label > span:first-child,
-#carte_blanche .col-texte .block-info,
-#carte_blanche .col-texte .block-title {
-  background: #2f4bf0 !important; color: #ffffff !important;
-  border-radius: 8px !important; padding: 4px 12px !important;
+#carte_blanche .col-texte .block-info, #carte_blanche .col-texte .block-title {
+  background: #2f4bf0 !important; color: #ffffff !important; border-radius: 8px !important;
+  padding: 4px 12px !important; font-weight: 600 !important;
   display: inline-block !important; width: auto !important;
-  font-weight: 600 !important; margin: 0 0 6px 0 !important;
+  max-width: max-content !important; box-shadow: none !important; margin: 0 0 6px 0 !important;
 }
-
-#ligne_entrees { flex-wrap: nowrap !important; gap: 16px !important; }
-
+#carte_blanche .col-texte label { display: block !important; width: 100% !important; max-width: 100% !important; }
 #btn_verifier button, #btn_verifier {
-  background: #2f4bf0 !important; color: #ffffff !important;
-  border: none !important; font-weight: 700 !important;
+  background: #2f4bf0 !important; color: #ffffff !important; border: none !important; font-weight: 700 !important;
 }
 #btn_verifier button:hover { background: #4661f5 !important; }
 #btn_effacer button, #btn_effacer {
   background: #3b4252 !important; color: #ffffff !important; border: none !important;
 }
-
 #pied { color: #9fb0cc; font-size: 12px; text-align: center; margin-top: 10px; }
-.gradio-container .label-wrap span { color: #ffffff !important; }
 """
 
 with gr.Blocks(css=CSS, title="Auditeur de Cohérence Médicale") as demo:
@@ -239,10 +186,9 @@ with gr.Blocks(css=CSS, title="Auditeur de Cohérence Médicale") as demo:
 
     with gr.Accordion("Comment ça marche ?", open=False):
         gr.Markdown(
-            "Déposez une radiographie thoracique, saisissez le compte rendu "
-            "clinique associé, puis lancez l'analyse. L'outil compare l'image et "
-            "le texte, et indique s'ils sont cohérents, accompagné d'un score de "
-            "confiance."
+            "Déposez une radiographie thoracique, saisissez le compte rendu clinique "
+            "associé, puis lancez l'analyse. L'application envoie l'image et le texte "
+            "à l'API de prédiction, qui renvoie un verdict et un score de confiance."
         )
 
     gr.HTML(

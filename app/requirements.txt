@@ -1,6 +1,1 @@
-torch
-torchvision
-transformers
-hi-ml-multimodal
-Pillow
-spaces
+gradio_client
