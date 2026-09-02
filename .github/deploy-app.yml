@@ -1,0 +1,38 @@
+# ============================================================================
+# Déploiement de l'App vers Hugging Face - MANUEL et CONTRÔLÉ
+# ----------------------------------------------------------------------------
+# Ne se déclenche QUE sur action manuelle (workflow_dispatch) : c'est TOI qui
+# décides de déployer, après avoir vérifié que les tests sont verts.
+# Avant d'envoyer, il re-vérifie le test de l'app (garde-fou).
+# ============================================================================
+
+name: Déploiement App (manuel)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy-app:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Récupérer le code
+        uses: actions/checkout@v4
+
+      - name: Installer Python 3.10
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Vérifier les tests de l'app (contrôle avant déploiement)
+        run: |
+          pip install pytest
+          cd app && pytest -v
+
+      - name: Déployer vers le Space Hugging Face
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          pip install huggingface_hub
+          python -c "from huggingface_hub import HfApi; import os; HfApi().upload_folder(folder_path='app', repo_id='AichaFaHugFace/Auditeur-App-Gradio', repo_type='space', token=os.environ['HF_TOKEN'], commit_message='Deploiement manuel depuis projet_final_ACM')"
+          echo "Déploiement terminé -> https://huggingface.co/spaces/AichaFaHugFace/Auditeur-App-Gradio"
