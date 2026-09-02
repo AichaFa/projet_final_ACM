@@ -7,6 +7,15 @@
 
 from gradio_client import Client, handle_file
 import gradio as gr
+import spaces
+
+
+@spaces.GPU
+def _reserve_gpu():
+    # Fonction GPU factice : requise pour démarrer un Space ZeroGPU.
+    # L'App n'utilise pas réellement le GPU (elle appelle l'API).
+    return True
+
 
 API_SPACE = "AichaFaHugFace/Auditeur-API"
 SEUIL = 0.5
