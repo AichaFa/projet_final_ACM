@@ -1,6 +1,6 @@
 # ============================================================================
 # Auditeur de Cohérence Médicale - Application AUTONOME (Gradio)
-# Thème : Fond blanc/gris bleu, cartes bleu nuit, badges bleu roi
+# Thème : Fond clair, cartes bleu nuit, badges bleu roi et score en %
 # ============================================================================
 
 import math
@@ -113,20 +113,23 @@ def verifier(image_path, texte):
     except Exception as e:
         return _carte("#ff6b6b", "", "Erreur lors de l'analyse", str(e))
 
+    # Conversion du score (0.0 - 1.0) en pourcentage (0% - 100%)
+    pourcentage = proba * 100
+
     if proba >= SEUIL:
         return _carte(
             "#3ddc84",
             ICONE_OK,
             "COHÉRENT",
             f"Le compte rendu correspond à la radiographie. "
-            f"Score de confiance : {proba:.3f}",
+            f"Score de confiance : <b>{pourcentage:.1f}%</b>",
         )
     return _carte(
         "#ff6b6b",
         ICONE_NON,
         "INCOHÉRENT",
         f"Le compte rendu ne correspond pas à la radiographie. "
-        f"Score de confiance : {proba:.3f}",
+        f"Score de confiance : <b>{pourcentage:.1f}%</b>",
     )
 
 
@@ -134,7 +137,7 @@ def effacer():
     return None, "", ""
 
 
-# --- Styles CSS fidèles à l'image ---
+# --- Styles CSS ---
 CSS = """
 /* Background global clair */
 html, body, .gradio-container, .app { 
@@ -187,11 +190,13 @@ html, body, .gradio-container, .app {
   gap: 16px !important; 
 }
 
-/* Style des labels sous forme de badge bleu */
-.col-image label span, .col-texte label span {
+/* Uniformisation des badges (labels) bleu roi pour l'image et le texte */
+.col-image label span, 
+.col-texte label span,
+.gradio-container .block label span {
   background-color: #2563eb !important;
   color: #ffffff !important;
-  padding: 4px 12px !important;
+  padding: 6px 14px !important;
   border-radius: 6px !important;
   font-weight: 600 !important;
   font-size: 14px !important;
