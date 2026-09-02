@@ -142,7 +142,8 @@ def effacer():
 CSS = """
 .gradio-container {
   background: linear-gradient(135deg, #0b1e3f 0%, #16306b 55%, #2e5fa3 100%) !important;
-  max-width: 1180px !important;
+  max-width: 1400px !important;
+  width: 95% !important;
   margin: 0 auto !important;
 }
 #entete {
