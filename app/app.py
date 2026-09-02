@@ -173,15 +173,28 @@ html, body, gradio-app, .gradio-container, .app, .main, .wrap, .contain, .fillab
 #carte_blanche textarea::placeholder { color: #9fb0cc !important; }
 
 /* Libellés identiques : badges bleus pour les deux */
-#carte_blanche .block-label, #carte_blanche label span,
-#carte_blanche label {
+/* Pastille bleue du libellé de l'image (overlay) */
+#carte_blanche .block-label {
   background: #2f4bf0 !important; color: #ffffff !important;
   border-radius: 8px !important; font-weight: 600 !important;
-  display: inline-block !important; width: auto !important;
-  max-width: max-content !important; padding: 4px 12px !important;
-  margin: 6px 0 4px 6px !important; box-shadow: none !important;
+  padding: 4px 12px !important; box-shadow: none !important;
 }
-#carte_blanche .label-wrap { width: auto !important; background: transparent !important; }
+/* Zone de texte : pleine largeur pour écrire confortablement */
+#carte_blanche .col-texte,
+#carte_blanche .col-texte .block,
+#carte_blanche .col-texte label,
+#carte_blanche .col-texte textarea {
+  width: 100% !important; max-width: 100% !important; display: block !important;
+}
+/* Libellé du compte rendu en pastille bleue, sans réduire la zone */
+#carte_blanche .col-texte label > span:first-child,
+#carte_blanche .col-texte .block-info,
+#carte_blanche .col-texte .block-title {
+  background: #2f4bf0 !important; color: #ffffff !important;
+  border-radius: 8px !important; padding: 4px 12px !important;
+  display: inline-block !important; width: auto !important;
+  font-weight: 600 !important; margin: 0 0 6px 0 !important;
+}
 
 #ligne_entrees { flex-wrap: nowrap !important; gap: 16px !important; }
 
