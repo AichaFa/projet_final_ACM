@@ -148,7 +148,7 @@ html, body, gradio-app, .gradio-container, .app, .main, .wrap, .contain, .fillab
 #carte_blanche .col-texte label, #carte_blanche .col-texte textarea {
   width: 100% !important; max-width: 100% !important;
 }
-#carte_blanche .col-image label, #carte_blanche .col-image .block-label,
+#carte_blanche .col-image .block-label,
 #carte_blanche .col-texte label > span:first-child,
 #carte_blanche .col-texte .block-info, #carte_blanche .col-texte .block-title {
   background: #2f4bf0 !important; color: #ffffff !important; border-radius: 8px !important;
