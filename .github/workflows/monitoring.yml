@@ -1,0 +1,44 @@
+# ============================================================================
+# Monitoring de dérive - planifié (dépôt unique projet_final_ACM)
+# ----------------------------------------------------------------------------
+# Se lance tout seul (tous les jours à 06:00 UTC) et peut aussi être déclenché
+# à la main. Il exécute l'orchestrateur : envoi du datalake + analyse de dérive.
+# Les secrets viennent des "Secrets" du dépôt (Neon + Hugging Face).
+# ============================================================================
+
+name: Monitoring de dérive (planifié)
+
+on:
+  schedule:
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+
+jobs:
+  monitoring:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: monitoring
+
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+      HF_DATASET: ${{ secrets.HF_DATASET }}
+
+    steps:
+      - name: Récupérer le code
+        uses: actions/checkout@v4
+
+      - name: Installer Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Installer les dépendances
+        run: pip install -r requirements.txt
+
+      - name: Générer la référence (baseline)
+        run: python mock_producer.py --reference
+
+      - name: Lancer l'orchestrateur (monitoring + déclencheur)
+        run: python orchestrateur.py
