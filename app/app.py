@@ -1,6 +1,7 @@
 # ============================================================================
 # Auditeur de Cohérence Médicale - Application AUTONOME (Gradio)
-# Thème : Fond clair, cartes bleu nuit, badges bleu roi et score en %
+# Thème calqué sur la maquette : fond navy sombre, carte blanche, badges bleus,
+# bouton bleu franc, textes blancs. Score de confiance en pourcentage.
 # ============================================================================
 
 import math
@@ -18,7 +19,6 @@ from transformers import AutoTokenizer, AutoModel
 
 SEUIL = 0.5
 
-# --- Chargement des encodeurs publics ---
 image_encoder = get_biovil_t_image_encoder()
 transform = create_chest_xray_transform_for_inference(resize=512, center_crop_size=448)
 image_engine = ImageInferenceEngine(image_encoder, transform)
@@ -31,26 +31,26 @@ text_model = AutoModel.from_pretrained(
 )
 text_model.eval()
 
-# --- Icônes de résultat ---
+
 ICONE_OK = (
     "<svg width='26' height='26' viewBox='0 0 24 24' fill='none'>"
-    "<circle cx='12' cy='12' r='11' fill='#3ddc84'/>"
-    "<path d='M7 12.5l3 3 7-7' stroke='#0e2447' stroke-width='2.2' "
+    "<circle cx='12' cy='12' r='11' fill='#2ecc71'/>"
+    "<path d='M7 12.5l3 3 7-7' stroke='white' stroke-width='2.2' "
     "fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>"
 )
 ICONE_NON = (
     "<svg width='26' height='26' viewBox='0 0 24 24' fill='none'>"
-    "<circle cx='12' cy='12' r='11' fill='#ff6b6b'/>"
-    "<path d='M8 8l8 8M16 8l-8 8' stroke='#0e2447' stroke-width='2.2' "
+    "<circle cx='12' cy='12' r='11' fill='#e74c3c'/>"
+    "<path d='M8 8l8 8M16 8l-8 8' stroke='white' stroke-width='2.2' "
     "stroke-linecap='round'/></svg>"
 )
 
 
 def _carte(accent, icone, titre, detail):
     return (
-        f"<div style='background:#182232; border-left:6px solid {accent}; "
+        f"<div style='background:#16233c; border-left:6px solid {accent}; "
         f"border-radius:12px; padding:18px 20px; display:flex; align-items:center; "
-        f"gap:14px; margin-top:8px; color:#ffffff;'>{icone}"
+        f"gap:14px; margin-top:10px;'>{icone}"
         f"<div><div style='font-size:20px; font-weight:700; color:{accent};'>{titre}</div>"
         f"<div style='color:#ffffff; margin-top:2px;'>{detail}</div></div></div>"
     )
@@ -60,7 +60,7 @@ def _carte(accent, icone, titre, detail):
 def verifier(image_path, texte):
     if image_path is None or not texte or not texte.strip():
         return _carte(
-            "#f5c542",
+            "#f1c40f",
             "",
             "Informations manquantes",
             "Merci de fournir une radiographie ET un compte rendu.",
@@ -111,25 +111,23 @@ def verifier(image_path, texte):
             similarite = torch.mm(image_embedding, text_embedding.t()).item()
             proba = 1 / (1 + math.exp(-similarite * 4))
     except Exception as e:
-        return _carte("#ff6b6b", "", "Erreur lors de l'analyse", str(e))
+        return _carte("#e74c3c", "", "Erreur lors de l'analyse", str(e))
 
-    # Conversion du score (0.0 - 1.0) en pourcentage (0% - 100%)
-    pourcentage = proba * 100
-
+    pourcentage = f"{proba * 100:.1f} %"
     if proba >= SEUIL:
         return _carte(
-            "#3ddc84",
+            "#2ecc71",
             ICONE_OK,
             "COHÉRENT",
             f"Le compte rendu correspond à la radiographie. "
-            f"Score de confiance : <b>{pourcentage:.1f}%</b>",
+            f"Score de confiance : {pourcentage}",
         )
     return _carte(
-        "#ff6b6b",
+        "#e74c3c",
         ICONE_NON,
         "INCOHÉRENT",
         f"Le compte rendu ne correspond pas à la radiographie. "
-        f"Score de confiance : <b>{pourcentage:.1f}%</b>",
+        f"Score de confiance : {pourcentage}",
     )
 
 
@@ -137,130 +135,70 @@ def effacer():
     return None, "", ""
 
 
-# --- Styles CSS ---
 CSS = """
-/* Background global clair */
-html, body, .gradio-container, .app { 
-  background: #eaf0f8 !important; 
+html, body, gradio-app, .gradio-container, .app, .main, .wrap, .contain, .fillable {
+  background: linear-gradient(160deg, #0a1424 0%, #0e2036 100%) !important;
+  background-attachment: fixed !important;
 }
-
 .gradio-container {
   max-width: 1400px !important;
   width: 95% !important;
   margin: 0 auto !important;
+  color: #ffffff !important;
 }
-
-/* En-tête bleu nuit arrondi */
+.gradio-container .prose, .gradio-container .prose *,
+.gradio-container h1, .gradio-container h2, .gradio-container h3 {
+  color: #ffffff !important;
+}
 #entete {
-  background: linear-gradient(180deg, #182848 0%, #101c30 100%);
-  padding: 24px;
-  border-radius: 16px;
-  margin-bottom: 16px;
-  text-align: center;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  background: linear-gradient(135deg, #16306b, #3a5bd0);
+  padding: 22px 26px; border-radius: 18px; margin-bottom: 14px;
+  box-shadow: 0 8px 22px rgba(0,0,0,0.5); text-align: center;
 }
-#entete h1 { 
-  margin: 0; 
-  font-size: 28px; 
-  font-weight: 700;
-  color: #ffffff !important; 
+#entete h1 { margin: 0; font-size: 28px; color: #ffffff !important; }
+#entete p { margin: 6px 0 0 0; color: #ffffff !important; opacity: 0.95; }
+
+/* Carte blanche derrière les deux panneaux */
+#carte_blanche {
+  background: #ffffff !important; border-radius: 18px !important; padding: 16px !important;
+  box-shadow: 0 8px 22px rgba(0,0,0,0.35);
 }
-#entete p { 
-  margin: 8px 0 0 0; 
-  color: #cbd5e1 !important; 
-  font-size: 15px;
+.col-image, .col-texte { background: transparent !important; border: none !important; padding: 6px !important; }
+
+/* Panneaux internes (image + texte) en navy foncé */
+#carte_blanche .block, #carte_blanche textarea, #carte_blanche .image-container {
+  background: #16233c !important; border: 1px solid #26375c !important;
+  border-radius: 12px !important; color: #ffffff !important;
+}
+#carte_blanche textarea::placeholder { color: #9fb0cc !important; }
+
+/* Libellés identiques : badges bleus pour les deux */
+#carte_blanche .block-label, #carte_blanche label span,
+#carte_blanche label {
+  background: #2f4bf0 !important; color: #ffffff !important;
+  border-radius: 8px !important; font-weight: 600 !important;
 }
 
-#carte_blanche { 
-  background: transparent !important; 
-  border: none !important; 
-  padding: 0 !important; 
-}
+#ligne_entrees { flex-wrap: nowrap !important; gap: 16px !important; }
 
-/* Blocs d'entrée sombres */
-.col-image, .col-texte {
-  background: #182232 !important; 
-  border: 1px solid #233148 !important;
-  border-radius: 12px; 
-  padding: 12px;
-}
-
-#ligne_entrees { 
-  flex-wrap: nowrap !important; 
-  gap: 16px !important; 
-}
-
-/* Uniformisation des badges (labels) bleu roi pour l'image et le texte */
-.col-image label span, 
-.col-texte label span,
-.gradio-container .block label span {
-  background-color: #2563eb !important;
-  color: #ffffff !important;
-  padding: 6px 14px !important;
-  border-radius: 6px !important;
-  font-weight: 600 !important;
-  font-size: 14px !important;
-  display: inline-block !important;
-  margin-bottom: 8px !important;
-}
-
-/* Zone de texte */
-.gradio-container textarea {
-  background: #101726 !important; 
-  color: #ffffff !important;
-  border: 1px solid #233148 !important;
-  border-radius: 8px !important;
-}
-
-/* Boutons */
 #btn_verifier button, #btn_verifier {
-  background: #2563eb !important; 
-  color: #ffffff !important;
-  border: none !important; 
-  font-weight: 600 !important;
-  font-size: 16px !important;
-  border-radius: 8px !important;
+  background: #2f4bf0 !important; color: #ffffff !important;
+  border: none !important; font-weight: 700 !important;
 }
-#btn_verifier button:hover { 
-  background: #1d4ed8 !important; 
-}
-
+#btn_verifier button:hover { background: #4661f5 !important; }
 #btn_effacer button, #btn_effacer {
-  background: #334155 !important; 
-  color: #ffffff !important;
-  border: none !important;
-  font-weight: 600 !important;
-  font-size: 16px !important;
-  border-radius: 8px !important;
-}
-#btn_effacer button:hover {
-  background: #475569 !important;
+  background: #3b4252 !important; color: #ffffff !important; border: none !important;
 }
 
-/* Accordéon */
-.gradio-container .accordion {
-  background: #182232 !important;
-  border: 1px solid #233148 !important;
-  border-radius: 8px !important;
-  color: #ffffff !important;
-}
-.gradio-container .accordion span {
-  color: #ffffff !important;
-}
-
-/* Pied de page */
-#pied { 
-  color: #64748b; 
-  font-size: 13px; 
-  text-align: center; 
-  margin-top: 16px; 
-}
+#pied { color: #9fb0cc; font-size: 12px; text-align: center; margin-top: 10px; }
+.gradio-container .label-wrap span { color: #ffffff !important; }
 """
 
 with gr.Blocks(css=CSS, title="Auditeur de Cohérence Médicale") as demo:
     gr.HTML(
         "<div id='entete'><h1>Auditeur de Cohérence Médicale</h1>"
-        "<p>Vérifiez si un compte rendu clinique correspond bien à sa radiographie thoracique</p></div>"
+        "<p>Vérifiez si un compte rendu clinique correspond bien à sa "
+        "radiographie thoracique</p></div>"
     )
     with gr.Group(elem_id="carte_blanche"):
         with gr.Row(elem_id="ligne_entrees", equal_height=True):
@@ -272,7 +210,8 @@ with gr.Blocks(css=CSS, title="Auditeur de Cohérence Médicale") as demo:
                 texte_in = gr.Textbox(
                     label="Compte rendu radiologique",
                     lines=11,
-                    placeholder="ex. : Radiographie thoracique de face montrant un épanchement pleural bilatéral modéré...",
+                    placeholder="ex. : Radiographie thoracique de face montrant un "
+                    "épanchement pleural bilatéral modéré...",
                 )
         with gr.Row():
             bouton = gr.Button(
@@ -283,12 +222,15 @@ with gr.Blocks(css=CSS, title="Auditeur de Cohérence Médicale") as demo:
 
     with gr.Accordion("Comment ça marche ?", open=False):
         gr.Markdown(
-            "Déposez une radiographie thoracique, saisissez le compte rendu clinique associé, puis lancez l'analyse. "
-            "L'outil compare l'image et le texte, et indique s'ils sont cohérents, accompagné d'un score de confiance."
+            "Déposez une radiographie thoracique, saisissez le compte rendu "
+            "clinique associé, puis lancez l'analyse. L'outil compare l'image et "
+            "le texte, et indique s'ils sont cohérents, accompagné d'un score de "
+            "confiance."
         )
 
     gr.HTML(
-        "<div id='pied'>Démonstration à visée pédagogique - ne remplace pas l'avis d'un professionnel de santé.</div>"
+        "<div id='pied'>Démonstration à visée pédagogique - ne remplace pas "
+        "l'avis d'un professionnel de santé.</div>"
     )
 
     bouton.click(verifier, inputs=[image_in, texte_in], outputs=resultat)
