@@ -143,16 +143,31 @@ CSS = """
 .gradio-container {
   background: linear-gradient(135deg, #0b1e3f 0%, #16306b 55%, #2e5fa3 100%) !important;
   max-width: 1180px !important;
+  margin: 0 auto !important;
 }
 #entete {
   background: linear-gradient(135deg, #16306b, #2e6bb0);
   color: white; padding: 24px 28px; border-radius: 16px; margin-bottom: 10px;
-  box-shadow: 0 6px 18px rgba(0,0,0,0.25);
+  box-shadow: 0 6px 18px rgba(0,0,0,0.25); text-align: center;
 }
 #entete h1 { margin: 0; font-size: 27px; }
 #entete p { margin: 6px 0 0 0; opacity: 0.92; }
 #carte_blanche { background: white; border-radius: 16px; padding: 16px; }
-.gr-button-primary { background: #2e6bb0 !important; border: none !important; }
+.col-image {
+  background: #eaf1fb; border: 1px solid #cdd9ef; border-radius: 12px; padding: 12px;
+}
+.col-texte {
+  background: #eef7f1; border: 1px solid #cfe6d8; border-radius: 12px; padding: 12px;
+}
+#btn_verifier button, #btn_verifier {
+  background: #16306b !important; color: #ffffff !important;
+  border: none !important; font-weight: 600 !important;
+}
+#btn_verifier button:hover { background: #1f4488 !important; }
+#btn_effacer button, #btn_effacer {
+  background: #e7ecf5 !important; color: #16306b !important;
+  border: 1px solid #cdd9ef !important;
+}
 #pied { color: #cdd6ea; font-size: 12px; text-align: center; margin-top: 8px; }
 """
 
@@ -164,13 +179,17 @@ with gr.Blocks(css=CSS, title="Auditeur de Cohérence Médicale") as demo:
     )
     with gr.Group(elem_id="carte_blanche"):
         with gr.Row():
-            image_in = gr.Image(
-                label="Radiographie thoracique", type="filepath", height=340
-            )
-            texte_in = gr.Textbox(label="Compte rendu radiologique", lines=14)
+            with gr.Column(elem_classes="col-image"):
+                image_in = gr.Image(
+                    label="Radiographie thoracique", type="filepath", height=340
+                )
+            with gr.Column(elem_classes="col-texte"):
+                texte_in = gr.Textbox(label="Compte rendu radiologique", lines=14)
         with gr.Row():
-            bouton = gr.Button("Lancer la vérification", variant="primary", scale=3)
-            bouton_effacer = gr.Button("Effacer", scale=1)
+            bouton = gr.Button(
+                "Lancer la vérification", elem_id="btn_verifier", scale=3
+            )
+            bouton_effacer = gr.Button("Effacer", elem_id="btn_effacer", scale=1)
         resultat = gr.HTML()
 
     with gr.Accordion("Comment ça marche ?", open=False):
