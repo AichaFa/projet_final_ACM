@@ -1,9 +1,5 @@
 # ============================================================================
-# Monitoring de dérive - planifié (dépôt unique projet_final_ACM)
-# ----------------------------------------------------------------------------
-# Se lance tout seul (tous les jours à 06:00 UTC) et peut aussi être déclenché
-# à la main. Il exécute l'orchestrateur : envoi du datalake + analyse de dérive.
-# Les secrets viennent des "Secrets" du dépôt (Neon + Hugging Face).
+# Monitoring de dérive - planifié + rapport HTML publié en Artifact
 # ============================================================================
 
 name: Monitoring de dérive (planifié)
@@ -42,3 +38,10 @@ jobs:
 
       - name: Lancer l'orchestrateur (monitoring + déclencheur)
         run: python orchestrateur.py
+
+      - name: Publier le rapport de dérive (Artifact)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rapport-derive
+          path: monitoring/rapports/
