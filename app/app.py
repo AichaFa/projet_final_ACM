@@ -1,8 +1,5 @@
 # ============================================================================
-# Auditeur de Cohérence Médicale - APP (interface) reliée à l'API
-# ----------------------------------------------------------------------------
-# L'App n'exécute PAS le modèle : elle appelle le Space API (Auditeur-API),
-# récupère "VERDICT|score" et l'affiche dans une belle carte.
+# Auditeur de Cohérence Médicale - APP reliée à l'API de Samer + journalisation
 # ============================================================================
 
 import requests
@@ -19,6 +16,52 @@ def _reserve_gpu():
 
 # API de Samer (FastAPI + modèle entraîné chargé depuis MLflow)
 API_URL = "https://sammec-demoday-fastapi.hf.space/predict"
+
+# --- Journalisation vers Neon (données de production, sans texte patient) ---
+import os
+from datetime import datetime
+from sqlalchemy import create_engine, text as sql_text
+
+DATABASE_URL = os.environ.get("DATABASE_URL")
+_ENGINE = None
+
+
+def _engine():
+    global _ENGINE
+    if _ENGINE is None and DATABASE_URL:
+        url = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+        _ENGINE = create_engine(url, pool_pre_ping=True)
+        with _ENGINE.begin() as con:
+            con.execute(
+                sql_text(
+                    "CREATE TABLE IF NOT EXISTS predictions ("
+                    "horodatage TIMESTAMP, longueur_texte INTEGER,"
+                    " luminosite_image DOUBLE PRECISION, prediction INTEGER,"
+                    " probabilite DOUBLE PRECISION)"
+                )
+            )
+    return _ENGINE
+
+
+def journaliser(longueur_texte, luminosite, prediction, probabilite):
+    eng = _engine()
+    if eng is None:
+        return
+    with eng.begin() as con:
+        con.execute(
+            sql_text(
+                "INSERT INTO predictions (horodatage, longueur_texte,"
+                " luminosite_image, prediction, probabilite)"
+                " VALUES (:h, :l, :lu, :p, :pr)"
+            ),
+            {
+                "h": datetime.now().isoformat(timespec="seconds"),
+                "l": int(longueur_texte),
+                "lu": round(float(luminosite), 3),
+                "p": int(prediction),
+                "pr": round(float(probabilite), 4),
+            },
+        )
 
 
 ICONE_OK = (
@@ -83,6 +126,17 @@ def verifier(image_path, texte):
         probability = float(res.get("probability", 0.0))
     except Exception:
         return _carte("#e74c3c", "", "Réponse inattendue", str(reponse.text)[:200])
+
+    # Journaliser la prédiction dans Neon (indicateurs seulement, jamais le texte)
+    try:
+        from PIL import Image
+
+        vignette = Image.open(image_path).convert("L").resize((64, 64))
+        pixels = list(vignette.getdata())
+        luminosite = (sum(pixels) / len(pixels)) / 255.0
+        journaliser(len(texte), luminosite, prediction, probability)
+    except Exception:
+        pass
 
     # Interprétation identique au dashboard de Samer :
     # prediction == 1 -> COHÉRENT (score = probability)

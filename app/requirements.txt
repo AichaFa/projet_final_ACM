@@ -1,2 +1,5 @@
 requests
 spaces
+sqlalchemy
+psycopg2-binary
+Pillow
