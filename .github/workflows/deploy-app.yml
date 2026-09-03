@@ -1,6 +1,18 @@
-name: Déploiement App (manuel)
+# ============================================================================
+# Déploiement de l'App vers Hugging Face - AUTOMATIQUE (sur push) + manuel
+# ----------------------------------------------------------------------------
+# Se déclenche automatiquement à chaque push touchant app/ (ou ce fichier),
+# et reste lançable à la main. Il vérifie d'abord le test de l'app :
+# si le test échoue, le déploiement ne se fait pas.
+# ============================================================================
+
+name: Déploiement App (auto)
 
 on:
+  push:
+    paths:
+      - "app/**"
+      - ".github/workflows/deploy-app.yml"
   workflow_dispatch:
 
 jobs:
@@ -26,5 +38,5 @@ jobs:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
           pip install huggingface_hub
-          python -c "from huggingface_hub import HfApi; import os; HfApi().upload_folder(folder_path='app', repo_id='AichaFaHugFace/Auditeur-App-Gradio', repo_type='space', token=os.environ['HF_TOKEN'], commit_message='Deploiement manuel depuis projet_final_ACM')"
+          python -c "from huggingface_hub import HfApi; import os; HfApi().upload_folder(folder_path='app', repo_id='AichaFaHugFace/Auditeur-App-Gradio', repo_type='space', token=os.environ['HF_TOKEN'], commit_message='Deploiement automatique depuis projet_final_ACM')"
           echo "Déploiement terminé -> https://huggingface.co/spaces/AichaFaHugFace/Auditeur-App-Gradio"
