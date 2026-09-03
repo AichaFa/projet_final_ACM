@@ -5,7 +5,7 @@
 # récupère "VERDICT|score" et l'affiche dans une belle carte.
 # ============================================================================
 
-from gradio_client import Client, handle_file
+import requests
 import gradio as gr
 import spaces
 
@@ -13,21 +13,12 @@ import spaces
 @spaces.GPU
 def _reserve_gpu():
     # Fonction GPU factice : requise pour démarrer un Space ZeroGPU.
-    # L'App n'utilise pas réellement le GPU (elle appelle l'API).
+    # L'App n'utilise pas le GPU (elle appelle l'API de Samer).
     return True
 
 
-API_SPACE = "AichaFaHugFace/Auditeur-API"
-SEUIL = 0.5
-
-_client = None
-
-
-def get_client():
-    global _client
-    if _client is None:
-        _client = Client(API_SPACE)
-    return _client
+# API de Samer (FastAPI + modèle entraîné chargé depuis MLflow)
+API_URL = "https://sammec-demoday-fastapi.hf.space/predict"
 
 
 ICONE_OK = (
@@ -62,35 +53,42 @@ def verifier(image_path, texte):
             "Informations manquantes",
             "Merci de fournir une radiographie ET un compte rendu.",
         )
-    # Appel de l'API (le moteur)
+    # Appel de l'API de Samer (envoi image + texte)
     try:
-        reponse = get_client().predict(
-            image_path=handle_file(image_path), texte=texte, api_name="/predire"
-        )
+        with open(image_path, "rb") as f:
+            fichiers = {"image_file": ("radio.png", f, "image/png")}
+            donnees = {"text_input": texte}
+            reponse = requests.post(API_URL, data=donnees, files=fichiers, timeout=120)
     except Exception:
         return _carte(
             "#e74c3c",
             "",
             "Erreur de l'API",
-            "L'API n'a pas répondu (Space en veille ?). Réessaie dans un instant.",
+            "L'API n'a pas répondu. Vérifie qu'elle est allumée, puis réessaie.",
         )
-    # Lecture de "VERDICT|score"
-    try:
-        verdict, score = str(reponse).split("|")
-        proba = float(score)
-    except Exception:
-        return _carte("#e74c3c", "", "Réponse inattendue", str(reponse))
 
-    if verdict == "ERREUR":
+    if reponse.status_code == 503:
         return _carte(
-            "#e74c3c",
+            "#f1c40f",
             "",
-            "Erreur lors de l'analyse",
-            "Vérifie que l'image et le texte sont valides.",
+            "API en démarrage",
+            "Le modèle s'initialise. Réessaie dans quelques secondes.",
         )
+    if reponse.status_code != 200:
+        return _carte("#e74c3c", "", "Erreur de l'API", f"Code {reponse.status_code}.")
 
-    pourcentage = f"{proba * 100:.1f} %"
-    if verdict == "COHERENT":
+    try:
+        res = reponse.json()
+        prediction = int(res.get("prediction"))
+        probability = float(res.get("probability", 0.0))
+    except Exception:
+        return _carte("#e74c3c", "", "Réponse inattendue", str(reponse.text)[:200])
+
+    # Interprétation identique au dashboard de Samer :
+    # prediction == 1 -> COHÉRENT (score = probability)
+    # prediction == 0 -> INCOHÉRENT (score = 1 - probability)
+    if prediction == 1:
+        pourcentage = f"{probability * 100:.1f} %"
         return _carte(
             "#2ecc71",
             ICONE_OK,
@@ -98,6 +96,7 @@ def verifier(image_path, texte):
             f"Le compte rendu correspond à la radiographie. "
             f"Score de confiance : {pourcentage}",
         )
+    pourcentage = f"{(1 - probability) * 100:.1f} %"
     return _carte(
         "#e74c3c",
         ICONE_NON,

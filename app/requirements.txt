@@ -1,2 +1,2 @@
-gradio_client
+requests
 spaces
