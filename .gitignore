@@ -1,22 +1,23 @@
-# Secrets
+# ============================================================================
+# Fichiers à ne pas envoyer sur GitHub
+# ============================================================================
+
+# Données médicales : volumineuses et sensibles, jamais versionnées.
+# Elles se téléchargent séparément depuis leurs sources d'origine.
+CheXpert/
+**/CheXpert/
+df_chexpert*.csv
+chexpert_matches*.csv
+chexpert_mismatches*.csv
+chexpert_plus_dataset_sample.csv
+
+# Secrets et variables d'environnement
 .env
 *.env
-secrets.env
 
-# Données volumineuses (hors dépôt)
-CheXpert/
-*.csv
-data/
-datalake/
-
-# Modèles (hébergés sur Hugging Face)
-*.pth
-*.pt
-*.pt2
-modele/data/
-
-# Sorties et caches
-rapports/
+# Caches et environnements Python
 __pycache__/
 *.pyc
 .ipynb_checkpoints/
+.venv/
+venv/

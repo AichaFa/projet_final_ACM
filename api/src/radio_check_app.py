@@ -1,23 +1,21 @@
-# ============================================================================
-# Model API (FastAPI) - Auditeur de Cohérence Médicale
-# ----------------------------------------------------------------------------
-# Rôle : recevoir une radiographie (image) et un compte rendu (texte), les
-# passer dans le modèle BioViL-T + le classifieur à attention croisée, puis
-# renvoyer un score de cohérence. C'est le "moteur" appelé par l'application.
-#
-# Ce qui a changé par rapport à ta version d'origine :
-#   - commentaires explicatifs en français ;
-#   - ajout de la route /health ;
-#   - les grosses bibliothèques (torch, transformers, BioViL-T, MLflow) sont
-#     désormais importées À L'INTÉRIEUR des fonctions qui les utilisent, et non
-#     plus tout en haut. Pourquoi ? Ces paquets ne servent que lorsque les
-#     modèles se chargent ou qu'une prédiction est calculée. En les important
-#     là, un simple test (qui ne fait que "lire" le fichier et appeler /health)
-#     n'a plus besoin de les installer. Le comportement de l'API, lui, est
-#     identique quand elle tourne réellement.
-# ============================================================================
+"""
+API de l'Auditeur de Cohérence Médicale (FastAPI).
 
-import os  # Accès aux variables d'environnement (ex : APP_URI)
+Reçoit une radiographie (image) et un compte rendu (texte), les passe dans
+BioViL-T et le classifieur à attention croisée, puis renvoie un score de
+cohérence. C'est le moteur appelé par l'application.
+
+Chargement autonome : BioViL-T (public, licence MIT) et le classifieur
+reconstruit puis chargé depuis les poids portables locaux (model.safetensors).
+Aucune dépendance à un serveur MLflow ni à un stockage S3.
+
+Les grosses bibliothèques (torch, transformers, BioViL-T) sont importées à
+l'intérieur des fonctions qui les utilisent : un simple test qui ne fait que
+lire le fichier et appeler /health n'a donc pas besoin de les installer. Le
+comportement de l'API, lui, est identique quand elle tourne réellement.
+"""
+
+import os  # Accès au système de fichiers (chemin des poids)
 import io  # Lire le fichier image reçu directement en mémoire
 from fastapi import (
     FastAPI,
@@ -27,6 +25,10 @@ from fastapi import (
     HTTPException,
 )  # Briques de l'API web
 from PIL import Image  # Pillow : ouvre l'image reçue
+
+# Chemin des poids portables, résolu par rapport à ce fichier (donc valable
+# quel que soit le dossier de lancement).
+POIDS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "model.safetensors")
 
 # Création de l'application API et de son titre
 app = FastAPI(title="BioVil Cross-Attention+MLP Inference API")
@@ -38,9 +40,64 @@ tokenizer = None  # Découpe le texte en jetons pour le modèle
 text_model = None  # Encodeur de texte
 image_model = None  # Encodeur d'image
 image_transform = None  # Prétraitement de l'image (redimensionnement, recadrage)
-cross_att_classifier = (
-    None  # Classifieur final (attention croisée), chargé depuis MLflow
-)
+cross_att_classifier = None  # Classifieur final (attention croisée)
+
+
+def _construire_classifieur(device):
+    # Reconstruit l'architecture du classifieur (identique au notebook de
+    # modélisation) puis y charge les poids portables. Aucune exécution de
+    # code externe : le format safetensors ne contient que des chiffres.
+    import torch
+    import torch.nn as nn
+    from safetensors.torch import load_file
+
+    class VisualProjectionLayer(nn.Module):
+        def __init__(self, img_dim=128, text_dim=768):
+            super().__init__()
+            self.projector = nn.Linear(img_dim, text_dim)
+
+        def forward(self, img_patches):
+            x = img_patches.permute(0, 2, 3, 1)
+            x = x.flatten(1, 2)
+            return self.projector(x)
+
+    class CrossAttentionClassifierBiovil(nn.Module):
+        def __init__(self, embed_dim=768, num_heads=8, dropout=0.3):
+            super().__init__()
+            self.projection_layer = VisualProjectionLayer()
+            self.cross_attention = nn.MultiheadAttention(
+                embed_dim=embed_dim, num_heads=num_heads, dropout=dropout, batch_first=True
+            )
+            self.layer_norm1 = nn.LayerNorm(embed_dim)
+            self.layer_norm2 = nn.LayerNorm(embed_dim)
+            self.ffn = nn.Sequential(
+                nn.Linear(embed_dim, embed_dim * 2),
+                nn.GELU(),
+                nn.Dropout(dropout),
+                nn.Linear(embed_dim * 2, embed_dim),
+            )
+            self.classifier = nn.Sequential(
+                nn.Linear(embed_dim, 256),
+                nn.GELU(),
+                nn.LayerNorm(256),
+                nn.Dropout(dropout),
+                nn.Linear(256, 1),
+            )
+
+        def forward(self, img_patches, text_tokens):
+            img_patches_proj = self.projection_layer(img_patches)
+            norm_text = self.layer_norm1(text_tokens)
+            attn_output, _ = self.cross_attention(
+                query=norm_text, key=img_patches_proj, value=img_patches_proj
+            )
+            x = attn_output + text_tokens
+            x = self.layer_norm2(self.ffn(x)) + x
+            x_pooled, _ = torch.max(x, dim=1)
+            return self.classifier(x_pooled)
+
+    modele = CrossAttentionClassifierBiovil()
+    modele.load_state_dict(load_file(POIDS))
+    return modele.to(device).eval()
 
 
 # COMPOSANT DE DÉMARRAGE
@@ -51,7 +108,6 @@ def load_all_models_and_assets():
     try:
         # Les grosses bibliothèques sont importées ici, au moment où on en a besoin
         import torch
-        import mlflow.pytorch
         from transformers import AutoTokenizer, AutoModel
         from health_multimodal.image.model.pretrained import get_biovil_t_image_encoder
         from health_multimodal.image.data.transforms import (
@@ -79,20 +135,14 @@ def load_all_models_and_assets():
         )
         image_model.eval()
 
-        # Connexion au MLflow hébergé (adresse lue dans la variable d'environnement APP_URI),
-        # puis chargement du classifieur à attention croisée (dernière version enregistrée)
-        mlflow.set_tracking_uri(os.environ.get("APP_URI"))
-        model_uri = "models:/biovil_cross_attention_mlp/latest"
-
-        cross_att_classifier = mlflow.pytorch.load_model(
-            model_uri, map_location=torch.device("cpu")
-        )
-        cross_att_classifier.to(device).eval()
+        # Classifieur à attention croisée, reconstruit et chargé depuis les
+        # poids portables locaux (plus de MLflow ni de S3)
+        cross_att_classifier = _construire_classifieur(device)
 
         print("All 3 models and processors loaded into memory successfully!")
     except Exception as e:
         # En cas d'erreur au chargement, on l'affiche et on interrompt le démarrage
-        print(f"❌ Startup Error: {str(e)}")
+        print(f"Erreur au démarrage : {str(e)}")
         raise e
 
 
@@ -166,9 +216,7 @@ async def predict(
 
         # Passage dans le classifieur à attention croisée -> score de cohérence
         with torch.no_grad():
-            outputs = cross_att_classifier(
-                patch_img_emb, sequence_outputs[:, :256, :]
-            ).squeeze(1)
+            outputs = cross_att_classifier(patch_img_emb, sequence_outputs).squeeze(1)
             probability = torch.sigmoid(outputs).item()  # Score entre 0 et 1
             prediction = int(probability >= 0.5)  # 1 = cohérent, 0 = incohérent
 

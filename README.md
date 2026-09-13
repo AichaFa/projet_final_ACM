@@ -1,53 +1,50 @@
 # Auditeur de Cohérence Médicale
 
-Vérifier la cohérence entre une radiographie thoracique et son compte rendu
-radiologique - de la donnée jusqu'à une chaîne MLOps complète qui se surveille
-et se réentraîne. Ce dépôt réunit l'ensemble du projet, entièrement autonome.
+![Python](https://img.shields.io/badge/python-3670A0?style=for-the-badge&logo=python&logoColor=ffdd54)
+![PyTorch](https://img.shields.io/badge/PyTorch-EE4C2C?style=for-the-badge&logo=pytorch&logoColor=white)
+![Transformers](https://img.shields.io/badge/Transformers-FFD21E?style=for-the-badge&logo=huggingface&logoColor=black)
+![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white)
+![Gradio](https://img.shields.io/badge/Gradio-F97316?style=for-the-badge&logo=gradio&logoColor=white)
+![Evidently](https://img.shields.io/badge/Evidently-ED0400?style=for-the-badge)
+![PostgreSQL](https://img.shields.io/badge/Neon%20Postgres-336791?style=for-the-badge&logo=postgresql&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)
+![GitHub Actions](https://img.shields.io/badge/GitHub%20Actions-2088FF?style=for-the-badge&logo=githubactions&logoColor=white)
 
-## Vue d'ensemble (parcours de la donnée)
+## Présentation
 
-    Ingestion / Entraînement -> Intégration continue (CI) ->
-    Déploiement / Prédiction (CD) -> Monitoring / Réentraînement,
-    avec Tracking / Audit (MLflow) et un Orchestrateur au-dessus.
+Ce projet vérifie automatiquement qu'un compte rendu radiologique correspond bien à sa radiographie thoracique. Le système reçoit une paire image-texte et estime la probabilité qu'ils décrivent le même examen, afin de signaler les associations incohérentes pour une revue humaine. Il ne pose pas de diagnostic : c'est un outil d'audit multimodal.
 
-## Organisation du dépôt
+## Approche
 
-| Dossier | Rôle | Bloc de l'architecture |
-|---|---|---|
-| `1_exploration/` | Analyse exploratoire des données | Ingestion |
-| `2_preparation_donnees/` | Construction du jeu équilibré (paires image + texte) | Ingestion |
-| `3_modelisation/` | Notebooks du modèle (BioViL-T, BiomedCLIP) + suivi MLflow | Entraînement / Tracking |
-| `api/` | API de prédiction (FastAPI) + Dockerfile + tests + CI | Prédiction |
-| `app/` | Application (Gradio), déployée sur Hugging Face | Déploiement |
-| `monitoring/` | Journalisation, détection de dérive (Evidently), orchestrateur planifié | Monitoring |
-| `modele/` | Pointeur vers le modèle entraîné (hébergé sur le Dataset Hugging Face) | Tracking |
-| `docs/` | Schéma d'architecture, présentation | - |
+Le besoin métier est traduit en un problème de classification binaire : pour une paire (image, texte), prédire cohérent (1) ou incohérent (0), avec un score de confiance. Le modèle repose sur BioViL-T, des encodeurs image et texte spécialisés pour la radiographie thoracique, surmontés d'un classifieur à attention croisée où le texte interroge les régions de l'image.
 
-## Ce qui est à moi (autonome, sans dépendance externe)
+## Architecture
 
-- Application en ligne (Gradio, Hugging Face Space).
-- API de prédiction (FastAPI).
-- Intégration continue (GitHub Actions : style, tests dans Docker, alertes).
-- Stockage : data warehouse (Neon, PostgreSQL) + datalake (Dataset Hugging Face).
-- Monitoring automatisé (Evidently) et planifié.
-- Modèle entraîné `model.pth`, hébergé sur le Dataset Hugging Face.
+La solution est industrialisée selon une chaîne MLOps complète et autonome :
 
-## Ce qui reste public et gratuit (aucune dépendance)
+- Inférence : BioViL-T (public, licence MIT) et classifieur entraîné, chargé depuis des poids portables au format safetensors.
+- API : service FastAPI exposant les routes /health et /predict.
+- Application : interface Gradio déployée sur Hugging Face.
+- Entrepôt et datalake : PostgreSQL (Neon) et jeu de données Hugging Face.
+- Intégration et déploiement continus : GitHub Actions.
+- Monitoring : Evidently, détection de dérive sémantique sur les embeddings de texte.
 
-- Encodeurs BioViL-T (image et texte), téléchargés depuis Hugging Face.
+## Structure du dépôt
 
-## Données et gros fichiers (hors dépôt)
+- 1_exploration : analyses exploratoires.
+- 2_preparation_donnees : construction du jeu équilibré (paires cohérentes et incohérences calibrées).
+- 3_modelisation : entraînement du modèle et poids.
+- api : service FastAPI d'inférence.
+- app : application Gradio.
+- monitoring : surveillance de la dérive avec Evidently.
+- modele : poids du modèle.
+- docs : documentation.
+- .github : workflows d'intégration continue.
 
-Les données CheXpert (plus de 10 Go) et le modèle `model.pth` (~20 Mo) ne sont
-pas versionnés ici. Les données restent en local ; le modèle est hébergé sur le
-Dataset Hugging Face et chargé au besoin.
+## Données
 
-## Suivi de mise en place
+Les données proviennent de CheXpert (radiographies thoraciques et comptes rendus dé-identifiés). Volumineuses et sensibles, elles ne sont pas versionnées dans ce dépôt et se téléchargent séparément depuis leurs sources d'origine.
 
-- [ ] Squelette du dépôt (structure + README)
-- [ ] Intégration de l'application (app/)
-- [ ] Intégration de l'API (api/)
-- [ ] Intégration du monitoring (monitoring/)
-- [ ] Workflows propres (CI + déploiement contrôlé)
-- [ ] Artefacts sur stockage objet Neon (remplacement de S3)
-- [ ] Application autonome (chargement du modèle sans dépendance externe)
+## Stack technique
+
+Python, PyTorch, Transformers, BioViL-T, FastAPI, Gradio, safetensors, Evidently, PostgreSQL (Neon), Docker et GitHub Actions.

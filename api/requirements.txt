@@ -1,21 +1,19 @@
 # ============================================================================
-# Dépendances Python de l'API
+# Dépendances Python de l'API (version autonome)
 # Installées avec la commande : pip install -r requirements.txt
 # ============================================================================
 
 # --- Coeur Web & API ---
-fastapi[standard]     # Cadre pour construire l'API (inclut aussi uvicorn, le serveur, et httpx)
+fastapi[standard]     # Cadre pour construire l'API (inclut uvicorn, le serveur, et la CLI)
 
 # --- Apprentissage profond & langage ---
-transformers          # Modèles de langage (l'encodeur de texte CXR-BERT)
+torch                 # Calcul des modèles
+transformers          # Encodeur de texte CXR-BERT
 accelerate            # Optimise l'exécution des modèles (CPU / GPU)
 
 # --- Vision & images ---
 Pillow                # Ouvre et manipule les images (la radiographie)
-hi-ml-multimodal      # Fournit l'encodeur d'image BioViL-T et son prétraitement
+hi-ml-multimodal      # Encodeur d'image BioViL-T et son prétraitement
 
-# --- MLOps & registre de modèles distant (S3 / MLflow) ---
-mlflow                # Charge le modèle enregistré et suit les expériences
-boto3                 # Client Amazon AWS (accès au stockage S3)
-fsspec                # Couche d'accès aux fichiers distants
-s3fs                  # Permet de lire / écrire sur S3 comme un dossier
+# --- Poids du modèle (format portable) ---
+safetensors           # Charge les poids locaux (model.safetensors)
