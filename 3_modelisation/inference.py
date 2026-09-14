@@ -7,7 +7,9 @@ un verdict (cohérent ou incohérent) accompagné d'un score.
 Inférence autonome : chargement de BioViL-T (public, licence MIT),
 reconstruction du classifieur entraîné et chargement de ses poids
 portables (model.safetensors), puis application du seuil de décision
-de 0,5.
+de 0,5. Le compte rendu est tronqué aux 256 premiers jetons, exactement
+comme à l'entraînement. Les modèles sont chargés sur le processeur, puis
+basculés sur le GPU au moment de la prédiction lorsqu'un GPU est disponible.
 """
 
 import torch
@@ -28,7 +30,12 @@ from health_multimodal.image.data.transforms import create_chest_xray_transform_
 MODEL_ID = "microsoft/BiomedVLP-BioViL-T"   # BioViL-T, public, licence MIT
 WEIGHTS_PATH = "model.safetensors"           # poids portables du classifieur
 SEUIL = 0.5                                  # >= 0,5 : cohérent ; sinon : incohérent
-DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+LONGUEUR_TEXTE = 256                          # nombre de jetons utilisés, comme à l'entraînement
+
+
+def peripherique():
+    """Renvoie le GPU si disponible au moment de l'appel, sinon le processeur."""
+    return torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 # ---------------------------------------------------------------------------
@@ -85,7 +92,7 @@ class CrossAttentionClassifierBiovil(nn.Module):
 
 
 # ---------------------------------------------------------------------------
-# Chargement (une seule fois) de BioViL-T et du classifieur
+# Chargement (une seule fois) de BioViL-T et du classifieur, sur le processeur
 # ---------------------------------------------------------------------------
 _ressources = {}
 
@@ -95,16 +102,16 @@ def charger_modeles():
 
     # Côté texte : tokenizer et modèle CXR-BERT de BioViL-T
     tokenizer = AutoTokenizer.from_pretrained(MODEL_ID, trust_remote_code=True)
-    text_model = AutoModel.from_pretrained(MODEL_ID, trust_remote_code=True).to(DEVICE).eval()
+    text_model = AutoModel.from_pretrained(MODEL_ID, trust_remote_code=True).eval()
 
     # Côté image : encodeur image de BioViL-T
-    image_model = get_biovil_t_image_encoder().to(DEVICE).eval()
+    image_model = get_biovil_t_image_encoder().eval()
     image_transform = create_chest_xray_transform_for_inference(resize=512, center_crop_size=448)
 
     # Classifieur entraîné : architecture reconstruite, puis chargement des poids portables
     classifieur = CrossAttentionClassifierBiovil()
     classifieur.load_state_dict(load_file(WEIGHTS_PATH))
-    classifieur = classifieur.to(DEVICE).eval()
+    classifieur = classifieur.eval()
 
     _ressources.update(
         tokenizer=tokenizer,
@@ -119,7 +126,7 @@ def charger_modeles():
 # ---------------------------------------------------------------------------
 # Préparation des entrées
 # ---------------------------------------------------------------------------
-def encoder_texte(compte_rendu, r):
+def encoder_texte(compte_rendu, r, dev):
     """Transforme le compte rendu en une séquence de vecteurs, forme [1, 512, 768]."""
     inputs = r["tokenizer"](
         compte_rendu,
@@ -127,7 +134,7 @@ def encoder_texte(compte_rendu, r):
         truncation=True,
         max_length=512,
         return_tensors="pt",
-    ).to(DEVICE)
+    ).to(dev)
     with torch.no_grad():
         sortie = r["text_model"](
             input_ids=inputs.input_ids,
@@ -137,12 +144,12 @@ def encoder_texte(compte_rendu, r):
     return sortie.last_hidden_state
 
 
-def encoder_image(image, r):
+def encoder_image(image, r, dev):
     """Transforme la radiographie en patches, forme [1, 128, 14, 14]."""
     if not isinstance(image, Image.Image):
         image = Image.open(image)
     image = image.convert("L")
-    tenseur = r["image_transform"](image).unsqueeze(0).to(DEVICE)
+    tenseur = r["image_transform"](image).unsqueeze(0).to(dev)
     with torch.no_grad():
         sortie = r["image_model"](tenseur)
     return sortie.projected_patch_embeddings
@@ -160,9 +167,16 @@ def predire(image, compte_rendu):
       - confiance   : proximité au verdict rendu, entre 0,5 et 1
     """
     r = charger_modeles()
+    dev = peripherique()
 
-    patches_image = encoder_image(image, r)
-    sequence_texte = encoder_texte(compte_rendu, r)
+    # Bascule les modèles sur le périphérique courant (sans effet s'ils y sont déjà)
+    r["text_model"].to(dev)
+    r["image_model"].to(dev)
+    r["classifieur"].to(dev)
+
+    patches_image = encoder_image(image, r, dev)
+    sequence_texte = encoder_texte(compte_rendu, r, dev)
+    sequence_texte = sequence_texte[:, :LONGUEUR_TEXTE, :]   # 256 jetons, comme à l'entraînement
 
     with torch.no_grad():
         logit = r["classifieur"](patches_image, sequence_texte)

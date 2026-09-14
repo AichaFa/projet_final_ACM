@@ -21,3 +21,9 @@ __pycache__/
 .ipynb_checkpoints/
 .venv/
 venv/
+3_modelisation/features_demo/
+3_modelisation/mlruns/
+3_modelisation/mlflow.db
+_images_a_ignorer.txt
+_image_en_cours.txt
+__pycache__/

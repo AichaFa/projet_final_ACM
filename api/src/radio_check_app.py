@@ -216,7 +216,7 @@ async def predict(
 
         # Passage dans le classifieur à attention croisée -> score de cohérence
         with torch.no_grad():
-            outputs = cross_att_classifier(patch_img_emb, sequence_outputs).squeeze(1)
+            outputs = cross_att_classifier(patch_img_emb, sequence_outputs[:, :256, :]).squeeze(1)
             probability = torch.sigmoid(outputs).item()  # Score entre 0 et 1
             prediction = int(probability >= 0.5)  # 1 = cohérent, 0 = incohérent
 
