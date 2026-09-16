@@ -1,5 +1,9 @@
-requests
+gradio
 spaces
+torch
+transformers
+hi-ml-multimodal
+safetensors
+Pillow
 sqlalchemy
 psycopg2-binary
-Pillow

@@ -1,23 +1,20 @@
-# ============================================================================
-# Journalisation des prédictions - datalake + data warehouse (Neon / PostgreSQL)
-# ----------------------------------------------------------------------------
-# Chaque prédiction est enregistrée :
-#   - dans le DATALAKE (fichiers .jsonl bruts, dossier datalake/)
-#   - dans le DATA WAREHOUSE Neon (table "predictions" en PostgreSQL)
-#
-# La chaîne de connexion Neon est lue depuis le fichier .env (variable DATABASE_URL),
-# jamais écrite en clair dans le code.
-#
-# Simulation (pour tester la chaîne) :
-#   python journalisation.py            # 400 prédictions "normales"
-#   python journalisation.py --derive   # 400 prédictions AVEC dérive
-# ============================================================================
+"""
+Journalisation des prédictions - datalake + data warehouse (Neon / PostgreSQL).
+
+Chaque prédiction est enregistrée :
+  - dans le DATALAKE (fichiers .jsonl), avec l'embedding sémantique du compte rendu ;
+  - dans le DATA WAREHOUSE Neon (table "predictions"), avec les indicateurs de surface.
+
+L'embedding, riche et volumineux, vit dans le datalake ; l'entrepôt reste léger.
+La dérive sémantique se calcule ensuite sur les embeddings du datalake.
+"""
 
 import os
 import json
 from datetime import datetime
 from sqlalchemy import create_engine, text
 from dotenv import load_dotenv
+from embeddings import embedding_texte, DIM
 
 BASE = os.path.dirname(__file__)
 DATALAKE = os.path.join(BASE, "datalake")
@@ -47,27 +44,35 @@ def get_engine():
     return _ENGINE
 
 
-def journaliser_prediction(longueur_texte, luminosite_image, prediction, probabilite):
-    """À appeler après chaque prédiction de l'app."""
+def _ecrire_datalake(record):
     os.makedirs(DATALAKE, exist_ok=True)
-    record = {
-        "horodatage": datetime.now().isoformat(timespec="seconds"),
-        "longueur_texte": int(longueur_texte),
-        "luminosite_image": round(float(luminosite_image), 3),
-        "prediction": int(prediction),
-        "probabilite": round(float(probabilite), 3),
-    }
-    # 1) DATALAKE : ligne brute
     fichier = os.path.join(DATALAKE, "prod_" + datetime.now().strftime("%Y%m%d") + ".jsonl")
     with open(fichier, "a", encoding="utf-8") as f:
         f.write(json.dumps(record, ensure_ascii=False) + "\n")
-    # 2) DATA WAREHOUSE Neon : insertion
+
+
+def _ecrire_neon(record):
     engine = get_engine()
+    surface = {c: record[c] for c in ["horodatage"] + COLONNES}
     with engine.begin() as con:
         con.execute(text(
             "INSERT INTO predictions (horodatage, longueur_texte, luminosite_image, prediction, probabilite)"
             " VALUES (:horodatage, :longueur_texte, :luminosite_image, :prediction, :probabilite)"
-        ), record)
+        ), surface)
+
+
+def journaliser_prediction(compte_rendu, luminosite_image, prediction, probabilite):
+    """À appeler après chaque prédiction de l'application."""
+    record = {
+        "horodatage": datetime.now().isoformat(timespec="seconds"),
+        "longueur_texte": int(len(compte_rendu)),
+        "luminosite_image": round(float(luminosite_image), 3),
+        "prediction": int(prediction),
+        "probabilite": round(float(probabilite), 3),
+        "embedding": embedding_texte(compte_rendu),
+    }
+    _ecrire_datalake(record)
+    _ecrire_neon(record)
     return record
 
 
@@ -77,9 +82,22 @@ def _simuler(n, avec_derive):
     longueur = rng.normal(110 if avec_derive else 80, 22, n).clip(10)
     luminosite = rng.normal(0.55 if avec_derive else 0.45, 0.10, n).clip(0, 1)
     proba = rng.beta(2, 3 if avec_derive else 5, n)
+    # Un décalage de moyenne des embeddings représente une dérive du sens.
+    centre = 0.35 if avec_derive else 0.0
+    embeddings = rng.normal(centre, 1.0, (n, DIM))
     for i in range(n):
-        journaliser_prediction(longueur[i], luminosite[i], int(proba[i] >= 0.5), proba[i])
-    print(f"{n} prédictions journalisées (datalake + Neon).", "Dérive." if avec_derive else "")
+        record = {
+            "horodatage": datetime.now().isoformat(timespec="seconds"),
+            "longueur_texte": int(longueur[i]),
+            "luminosite_image": round(float(luminosite[i]), 3),
+            "prediction": int(proba[i] >= 0.5),
+            "probabilite": round(float(proba[i]), 3),
+            "embedding": embeddings[i].tolist(),
+        }
+        _ecrire_datalake(record)
+        _ecrire_neon(record)
+    print(f"{n} prédictions journalisées (datalake + Neon).",
+          "Dérive sémantique simulée." if avec_derive else "")
 
 
 if __name__ == "__main__":

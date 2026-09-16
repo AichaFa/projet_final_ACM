@@ -1,21 +1,32 @@
 # ============================================================================
-# Auditeur de Cohérence Médicale - APP reliée à l'API de Samer + journalisation
+# Auditeur de Cohérence Médicale - APP autonome (inférence locale) + journalisation
 # ============================================================================
 
-import requests
 import gradio as gr
-import spaces
+
+# Décorateur GPU du Space (ZeroGPU). Hors Hugging Face, il devient neutre,
+# ce qui permet de lancer l'application en local sans le paquet "spaces".
+try:
+    import spaces
+    gpu = spaces.GPU
+except Exception:
+    def gpu(fonction):
+        return fonction
+
+from inference import charger_modeles, predire
+
+# Préchargement de BioViL-T et du classifieur au démarrage du Space
+try:
+    charger_modeles()
+except Exception:
+    pass
 
 
-@spaces.GPU
-def _reserve_gpu():
-    # Fonction GPU factice : requise pour démarrer un Space ZeroGPU.
-    # L'App n'utilise pas le GPU (elle appelle l'API de Samer).
-    return True
+@gpu
+def _inferer(image_path, texte):
+    # Inférence exécutée sur le GPU lorsqu'il est disponible
+    return predire(image_path, texte)
 
-
-# API de Samer (FastAPI + modèle entraîné chargé depuis MLflow)
-API_URL = "https://sammec-demoday-fastapi.hf.space/predict"
 
 # --- Journalisation vers Neon (données de production, sans texte patient) ---
 import os
@@ -96,36 +107,19 @@ def verifier(image_path, texte):
             "Informations manquantes",
             "Merci de fournir une radiographie ET un compte rendu.",
         )
-    # Appel de l'API de Samer (envoi image + texte)
+
+    # Inférence locale (modèle embarqué) au lieu d'un appel à une API externe
     try:
-        with open(image_path, "rb") as f:
-            fichiers = {"image_file": ("radio.png", f, "image/png")}
-            donnees = {"text_input": texte}
-            reponse = requests.post(API_URL, data=donnees, files=fichiers, timeout=120)
+        res = _inferer(image_path, texte)
+        prediction = int(res["prediction"])
+        probability = float(res["probabilite"])
     except Exception:
         return _carte(
             "#e74c3c",
             "",
-            "Erreur de l'API",
-            "L'API n'a pas répondu. Vérifie qu'elle est allumée, puis réessaie.",
+            "Erreur lors de l'analyse",
+            "L'analyse n'a pas abouti. Réessaie dans quelques instants.",
         )
-
-    if reponse.status_code == 503:
-        return _carte(
-            "#f1c40f",
-            "",
-            "API en démarrage",
-            "Le modèle s'initialise. Réessaie dans quelques secondes.",
-        )
-    if reponse.status_code != 200:
-        return _carte("#e74c3c", "", "Erreur de l'API", f"Code {reponse.status_code}.")
-
-    try:
-        res = reponse.json()
-        prediction = int(res.get("prediction"))
-        probability = float(res.get("probability", 0.0))
-    except Exception:
-        return _carte("#e74c3c", "", "Réponse inattendue", str(reponse.text)[:200])
 
     # Journaliser la prédiction dans Neon (indicateurs seulement, jamais le texte)
     try:
@@ -138,7 +132,7 @@ def verifier(image_path, texte):
     except Exception:
         pass
 
-    # Interprétation identique au dashboard de Samer :
+    # Interprétation :
     # prediction == 1 -> COHÉRENT (score = probability)
     # prediction == 0 -> INCOHÉRENT (score = 1 - probability)
     if prediction == 1:
@@ -249,8 +243,9 @@ with gr.Blocks(css=CSS, title="Auditeur de Cohérence Médicale") as demo:
     with gr.Accordion("Comment ça marche ?", open=False):
         gr.Markdown(
             "Déposez une radiographie thoracique, saisissez le compte rendu clinique "
-            "associé, puis lancez l'analyse. L'application envoie l'image et le texte "
-            "à l'API de prédiction, qui renvoie un verdict et un score de confiance."
+            "associé, puis lancez l'analyse. L'application analyse directement l'image "
+            "et le texte avec le modèle embarqué, et renvoie un verdict accompagné d'un "
+            "score de confiance."
         )
 
     gr.HTML(

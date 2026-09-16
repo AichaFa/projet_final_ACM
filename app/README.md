@@ -8,6 +8,7 @@ app_file: app.py
 pinned: false
 ---
 
-Auditeur de Cohérence Médicale - interface (App).
-Envoie la radiographie et le compte rendu à l'API de prédiction (Auditeur-API)
-et affiche le verdict avec un score de confiance.
+Auditeur de Cohérence Médicale - interface (App) autonome.
+Analyse directement la radiographie et le compte rendu avec le modèle embarqué
+(BioViL-T et classifieur à attention croisée), affiche le verdict avec un score
+de confiance, et journalise la prédiction dans l'entrepôt de production.
