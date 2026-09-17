@@ -155,6 +155,27 @@ def encoder_image(image, r, dev):
     return sortie.projected_patch_embeddings
 
 
+def embedding_texte(compte_rendu):
+    """Renvoie l'embedding sémantique du compte rendu : une liste de 128 nombres.
+    Sert à la surveillance de la dérive sémantique des comptes rendus."""
+    r = charger_modeles()
+    dev = peripherique()
+    r["text_model"].to(dev)
+    inputs = r["tokenizer"](
+        compte_rendu,
+        padding="max_length",
+        truncation=True,
+        max_length=512,
+        return_tensors="pt",
+    ).to(dev)
+    with torch.no_grad():
+        emb = r["text_model"].get_projected_text_embeddings(
+            input_ids=inputs.input_ids,
+            attention_mask=inputs.attention_mask,
+        )
+    return emb.squeeze(0).cpu().tolist()
+
+
 # ---------------------------------------------------------------------------
 # Prédiction complète : image + texte -> verdict
 # ---------------------------------------------------------------------------

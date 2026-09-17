@@ -1,5 +1,8 @@
 # ============================================================================
-# Monitoring de dérive - planifié + rapport HTML publié en Artifact
+# Monitoring de dérive sémantique - planifié + rapport HTML publié en Artifact
+# ----------------------------------------------------------------------------
+# Lit les embeddings déjà calculés dans le datalake Azure (référence + production)
+# et mesure la dérive sémantique. Léger : pas de PyTorch, pas de BioViL-T.
 # ============================================================================
 
 name: Monitoring de dérive (planifié)
@@ -17,9 +20,7 @@ jobs:
         working-directory: monitoring
 
     env:
-      DATABASE_URL: ${{ secrets.DATABASE_URL }}
-      HF_TOKEN: ${{ secrets.HF_TOKEN }}
-      HF_DATASET: ${{ secrets.HF_DATASET }}
+      AZURE_STORAGE_CONNECTION_STRING: ${{ secrets.AZURE_STORAGE_CONNECTION_STRING }}
 
     steps:
       - name: Récupérer le code
@@ -31,13 +32,10 @@ jobs:
           python-version: "3.11"
 
       - name: Installer les dépendances
-        run: pip install -r requirements.txt
+        run: pip install pandas "evidently==0.7.21" azure-storage-blob python-dotenv
 
-      - name: Générer la référence (baseline)
-        run: python mock_producer.py --reference
-
-      - name: Lancer l'orchestrateur (monitoring + déclencheur)
-        run: python orchestrateur.py
+      - name: Lancer le monitoring de dérive sémantique
+        run: python monitoring.py
 
       - name: Publier le rapport de dérive (Artifact)
         if: always()

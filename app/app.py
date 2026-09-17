@@ -13,7 +13,7 @@ except Exception:
     def gpu(fonction):
         return fonction
 
-from inference import charger_modeles, predire
+from inference import charger_modeles, predire, embedding_texte
 
 # Préchargement de BioViL-T et du classifieur au démarrage du Space
 try:
@@ -25,7 +25,10 @@ except Exception:
 @gpu
 def _inferer(image_path, texte):
     # Inférence exécutée sur le GPU lorsqu'il est disponible
-    return predire(image_path, texte)
+    res = predire(image_path, texte)
+    # Embedding sémantique calculé ici, tant que le GPU est encore alloué
+    res["embedding"] = embedding_texte(texte)
+    return res
 
 
 # --- Journalisation vers Neon (données de production, sans texte patient) ---
@@ -130,7 +133,24 @@ def verifier(image_path, texte):
         luminosite = (sum(pixels) / len(pixels)) / 255.0
         journaliser(len(texte), luminosite, prediction, probability)
     except Exception:
-        pass
+        luminosite = 0.0
+
+    # Journaliser la prédiction dans le datalake Azure, avec l'embedding sémantique
+    # du compte rendu (jamais le texte lui-même). Sert à la surveillance de la dérive.
+    try:
+        from datalake_azure import ajouter_ligne
+
+        record = {
+            "horodatage": datetime.now().isoformat(timespec="seconds"),
+            "longueur_texte": len(texte),
+            "luminosite_image": round(luminosite, 3),
+            "prediction": prediction,
+            "probabilite": round(probability, 4),
+            "embedding": res["embedding"],
+        }
+        ajouter_ligne("production/prod_" + datetime.now().strftime("%Y%m%d") + ".jsonl", record)
+    except Exception as erreur:
+        print("Journalisation Azure impossible :", repr(erreur))
 
     # Interprétation :
     # prediction == 1 -> COHÉRENT (score = probability)

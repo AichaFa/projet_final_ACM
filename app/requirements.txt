@@ -7,3 +7,5 @@ safetensors
 Pillow
 sqlalchemy
 psycopg2-binary
+azure-storage-blob
+python-dotenv

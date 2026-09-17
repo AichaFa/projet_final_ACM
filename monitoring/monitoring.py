@@ -1,51 +1,42 @@
 """
 Monitoring de la dérive sémantique - compare les embeddings des comptes rendus de
-production à ceux de la référence (Evidently), et signale la dérive du sens.
+production (datalake Azure) à ceux de la référence, et signale la dérive du sens.
 
 La dérive est mesurée sur les 128 dimensions de l'embedding BioViL-T : au-delà d'une
 part de 0,55 de dimensions en dérive, une dérive sémantique est déclarée.
+
+Léger : lit des embeddings déjà calculés, sans recharger BioViL-T.
 """
 
 import os
-import glob
-import json
 import pandas as pd
 from evidently import Report
 from evidently.presets import DataDriftPreset
+from datalake_azure import lire_lignes
 
 BASE = os.path.dirname(__file__)
-DATALAKE = os.path.join(BASE, "datalake")
 RAPPORTS = os.path.join(BASE, "rapports")
 DIM = 128
 SEUIL_DERIVE = 0.55
 COLS = [f"emb_{i:03d}" for i in range(DIM)]
 
 
-def _lire_embeddings(chemins):
-    lignes = []
-    for chemin in chemins:
-        with open(chemin, encoding="utf-8") as f:
-            for ligne in f:
-                if ligne.strip():
-                    enr = json.loads(ligne)
-                    if "embedding" in enr:
-                        lignes.append(enr["embedding"])
-    return pd.DataFrame(lignes, columns=COLS)
+def _en_dataframe(records):
+    return pd.DataFrame([r["embedding"] for r in records if "embedding" in r], columns=COLS)
 
 
 def charger_reference():
-    chemin = os.path.join(DATALAKE, "reference_embeddings.jsonl")
-    if not os.path.exists(chemin):
-        raise SystemExit("Référence absente. Lance : python construire_reference.py")
-    return _lire_embeddings([chemin])
+    records = lire_lignes("reference/")
+    if not records:
+        raise SystemExit("Référence absente dans le datalake Azure. Lance : python construire_reference.py")
+    return _en_dataframe(records)
 
 
 def charger_production():
-    chemins = sorted(glob.glob(os.path.join(DATALAKE, "prod_*.jsonl")))
-    df = _lire_embeddings(chemins) if chemins else pd.DataFrame(columns=COLS)
-    if df.empty:
-        raise SystemExit("Aucun embedding de production. Lance l'app, ou : python journalisation.py --derive")
-    return df
+    records = lire_lignes("production/")
+    if not records:
+        raise SystemExit("Aucune prédiction de production dans le datalake Azure. Lance des prédictions sur l'application.")
+    return _en_dataframe(records)
 
 
 def analyser():
