@@ -30,3 +30,8 @@ __pycache__/
 auditeur-api_key.pem
 monitoring/datalake/
 monitoring/rapports/
+
+# Modeles entraines lourds : vont sur MLflow ou un stockage, pas dans Git
+*.safetensors
+*.pth
+dataset_kaggle/
