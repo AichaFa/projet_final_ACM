@@ -35,3 +35,6 @@ monitoring/rapports/
 *.safetensors
 *.pth
 dataset_kaggle/
+
+# Preuves de soutenance (captures personnelles, pas de code)
+preuves_soutenance/

@@ -12,6 +12,7 @@ comme à l'entraînement. Les modèles sont chargés sur le processeur, puis
 basculés sur le GPU au moment de la prédiction lorsqu'un GPU est disponible.
 """
 
+import os
 import torch
 import torch.nn as nn
 from PIL import Image
@@ -108,9 +109,14 @@ def charger_modeles():
     image_model = get_biovil_t_image_encoder().eval()
     image_transform = create_chest_xray_transform_for_inference(resize=512, center_crop_size=448)
 
-    # Classifieur entraîné : architecture reconstruite, puis chargement des poids portables
+    # Classifieur : architecture reconstruite. Les poids ne sont chargés que si le
+    # fichier existe. En inférence, model.safetensors est présent, donc le classifieur
+    # entraîné est chargé normalement. À l'entraînement (où ces poids sont justement
+    # ce que l'on produit), le fichier peut être absent : on garde alors le classifieur
+    # tel quel, sans erreur, car l'entraînement crée et entraîne son propre classifieur.
     classifieur = CrossAttentionClassifierBiovil()
-    classifieur.load_state_dict(load_file(WEIGHTS_PATH))
+    if os.path.exists(WEIGHTS_PATH):
+        classifieur.load_state_dict(load_file(WEIGHTS_PATH))
     classifieur = classifieur.eval()
 
     _ressources.update(

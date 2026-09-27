@@ -1,0 +1,37 @@
+# ============================================================================
+# Réentraînement - déclenché par la détection de dérive du monitoring
+# ----------------------------------------------------------------------------
+# Reçoit le signal "derive-detectee" envoyé par le monitoring, puis relance le
+# notebook d'entraînement sur Kaggle (la ressource de calcul GPU).
+# Peut aussi être lancé à la main (workflow_dispatch).
+# ============================================================================
+
+name: Réentraînement (sur dérive)
+
+on:
+  repository_dispatch:
+    types: [derive-detectee]
+  workflow_dispatch:
+
+jobs:
+  reentrainement:
+    runs-on: ubuntu-latest
+
+    env:
+      KAGGLE_USERNAME: ${{ secrets.KAGGLE_USERNAME }}
+      KAGGLE_KEY: ${{ secrets.KAGGLE_KEY }}
+
+    steps:
+      - name: Installer Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Installer l'outil Kaggle
+        run: pip install kaggle
+
+      - name: Récupérer le notebook d'entraînement depuis Kaggle
+        run: kaggle kernels pull aichajedha/auditeur-entrainement -p kernel -m
+
+      - name: Relancer le notebook (nouvelle exécution)
+        run: kaggle kernels push -p kernel
