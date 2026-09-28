@@ -1,3 +1,15 @@
+
+
+https://github.com/user-attachments/assets/98fc7a8c-cfca-4345-96da-5cddeaeffac5
+
+
+
+https://github.com/user-attachments/assets/4d08c68c-c364-461f-880e-6ad8d723680e
+
+
+
+https://github.com/user-attachments/assets/20b1f40a-6621-46a0-a054-95bdd7966c4d
+
 # Auditeur de Cohérence Médicale
 
 ![Python](https://img.shields.io/badge/python-3670A0?style=for-the-badge&logo=python&logoColor=ffdd54)
