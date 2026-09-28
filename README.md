@@ -1,8 +1,3 @@
-
-
-https://github.com/user-attachments/assets/98fc7a8c-cfca-4345-96da-5cddeaeffac5
-
-
 # Auditeur de Cohérence Médicale
 
 ![Python](https://img.shields.io/badge/python-3670A0?style=for-the-badge&logo=python&logoColor=ffdd54)
@@ -29,7 +24,7 @@ Ce projet vérifie automatiquement qu'un compte rendu radiologique correspond bi
 
 Démonstration vidéo (glisser la vidéo ici depuis l'éditeur GitHub) :
 
-<!-- Pour ajouter la vidéo : éditer ce README sur GitHub et déposer le fichier vidéo à cet emplacement. GitHub génère automatiquement un lecteur intégré. -->
+https://github.com/user-attachments/assets/98fc7a8c-cfca-4345-96da-5cddeaeffac5
 
 ## Approche
 
