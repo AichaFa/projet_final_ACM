@@ -1,5 +1,5 @@
 # ============================================================================
-# Dépendances Python de l'API (version autonome)
+# Dépendances Python de l'API
 # Installées avec la commande : pip install -r requirements.txt
 # ============================================================================
 
@@ -16,4 +16,8 @@ Pillow                # Ouvre et manipule les images (la radiographie)
 hi-ml-multimodal      # Encodeur d'image BioViL-T et son prétraitement
 
 # --- Poids du modèle (format portable) ---
-safetensors           # Charge les poids locaux (model.safetensors)
+safetensors           # Charge les poids (model.safetensors)
+
+# --- Registre de modèles ---
+mlflow==3.16.0        # Récupère le modèle de production (alias "prod") depuis le registre
+azure-storage-blob    # Accès au stockage des artefacts (Azure Blob) pour télécharger le modèle

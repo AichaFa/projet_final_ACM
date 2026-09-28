@@ -38,3 +38,6 @@ dataset_kaggle/
 
 # Preuves de soutenance (captures personnelles, pas de code)
 preuves_soutenance/
+
+# Fichier utilitaire local (copie de cellule Kaggle), non versionne
+3_modelisation/cellule_secret_mlflow.py

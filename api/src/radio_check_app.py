@@ -5,9 +5,13 @@ Reçoit une radiographie (image) et un compte rendu (texte), les passe dans
 BioViL-T et le classifieur à attention croisée, puis renvoie un score de
 cohérence. C'est le moteur appelé par l'application.
 
-Chargement autonome : BioViL-T (public, licence MIT) et le classifieur
-reconstruit puis chargé depuis les poids portables locaux (model.safetensors).
-Aucune dépendance à un serveur MLflow ni à un stockage S3.
+Chargement du modèle : au démarrage, l'API récupère le modèle de production
+(la version qui porte l'alias "prod") depuis le registre MLflow, qui est la
+source de vérité. Si le serveur MLflow est momentanément indisponible, l'API
+bascule sur la dernière copie locale des poids (model.safetensors), afin de
+garantir la continuité de service plutôt que de tomber en panne. La route
+/reload-model permet de recharger le modèle de production à chaud, sans
+redémarrer l'API (utile après un réentraînement qui a promu un nouveau modèle).
 
 Les grosses bibliothèques (torch, transformers, BioViL-T) sont importées à
 l'intérieur des fonctions qui les utilisent : un simple test qui ne fait que
@@ -15,8 +19,9 @@ lire le fichier et appeler /health n'a donc pas besoin de les installer. Le
 comportement de l'API, lui, est identique quand elle tourne réellement.
 """
 
-import os  # Accès au système de fichiers (chemin des poids)
+import os  # Accès au système de fichiers (chemins)
 import io  # Lire le fichier image reçu directement en mémoire
+import shutil  # Copier la version de production vers la copie locale de secours
 from fastapi import (
     FastAPI,
     UploadFile,
@@ -26,27 +31,77 @@ from fastapi import (
 )  # Briques de l'API web
 from PIL import Image  # Pillow : ouvre l'image reçue
 
-# Chemin des poids portables, résolu par rapport à ce fichier (donc valable
-# quel que soit le dossier de lancement).
-POIDS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "model.safetensors")
+# Dossier de ce fichier, pour résoudre les chemins quel que soit le dossier de lancement.
+BASE = os.path.dirname(os.path.abspath(__file__))
+
+# Copie locale de secours des poids. Elle sert si MLflow est indisponible, et elle
+# est rafraîchie avec la version de production à chaque chargement réussi depuis MLflow.
+POIDS_LOCAL = os.path.join(BASE, "model.safetensors")
+
+# Dossier où déposer le modèle de production téléchargé depuis MLflow.
+DOSSIER_TELECHARGEMENT = os.path.join(BASE, "_modele_prod")
+
+# Nom du modèle dans le registre MLflow.
+NOM_MODELE = "auditeur-coherence-medicale"
+
+# Adresse du serveur MLflow : lue depuis la variable d'environnement si présente,
+# sinon adresse par défaut du serveur MLflow hébergé sur Azure.
+ADRESSE_MLFLOW = os.environ.get(
+    "MLFLOW_TRACKING_URI",
+    "https://auditeur-mlflow-hbb4ambmcnhhfjcz.swedencentral-01.azurewebsites.net",
+)
 
 # Création de l'application API et de son titre
 app = FastAPI(title="BioVil Cross-Attention+MLP Inference API")
 
-# Variables globales : elles contiendront les modèles et outils, chargés une
-# seule fois au démarrage puis réutilisés à chaque requête. Elles valent None au départ.
+# Variables globales : elles contiennent les modèles et outils, chargés au démarrage
+# puis réutilisés à chaque requête. Elles valent None au départ.
 device = None  # "cuda" (carte graphique) ou "cpu"
 tokenizer = None  # Découpe le texte en jetons pour le modèle
 text_model = None  # Encodeur de texte
 image_model = None  # Encodeur d'image
 image_transform = None  # Prétraitement de l'image (redimensionnement, recadrage)
 cross_att_classifier = None  # Classifieur final (attention croisée)
+origine_modele = None  # "MLflow (prod)" ou "fichier local", pour information
 
 
-def _construire_classifieur(device):
+def obtenir_poids():
+    """Renvoie (chemin des poids, origine).
+
+    Essaie d'abord de récupérer le modèle de production (alias "prod") depuis le
+    registre MLflow. En cas de succès, la copie locale de secours est rafraîchie.
+    Si MLflow est indisponible (serveur endormi, réseau, alias absent), on bascule
+    sur la copie locale des poids, afin de ne jamais interrompre le service.
+    """
+    try:
+        import mlflow
+
+        mlflow.set_tracking_uri(ADRESSE_MLFLOW)
+        client = mlflow.MlflowClient()
+        version_prod = client.get_model_version_by_alias(NOM_MODELE, "prod")
+
+        os.makedirs(DOSSIER_TELECHARGEMENT, exist_ok=True)
+        chemin = mlflow.artifacts.download_artifacts(
+            artifact_uri=version_prod.source, dst_path=DOSSIER_TELECHARGEMENT
+        )
+
+        # Rafraîchit la copie locale de secours avec la version de production,
+        # pour qu'un futur démarrage sans MLflow serve bien la dernière version connue.
+        try:
+            shutil.copy(chemin, POIDS_LOCAL)
+        except Exception:
+            pass
+
+        return chemin, "MLflow (prod)"
+    except Exception as e:
+        print(f"MLflow indisponible ({e}) : repli sur la copie locale des poids.")
+        return POIDS_LOCAL, "fichier local"
+
+
+def _construire_classifieur(device, chemin_poids):
     # Reconstruit l'architecture du classifieur (identique au notebook de
-    # modélisation) puis y charge les poids portables. Aucune exécution de
-    # code externe : le format safetensors ne contient que des chiffres.
+    # modélisation) puis y charge les poids portables depuis le chemin fourni.
+    # Aucune exécution de code externe : le format safetensors ne contient que des chiffres.
     import torch
     import torch.nn as nn
     from safetensors.torch import load_file
@@ -96,7 +151,7 @@ def _construire_classifieur(device):
             return self.classifier(x_pooled)
 
     modele = CrossAttentionClassifierBiovil()
-    modele.load_state_dict(load_file(POIDS))
+    modele.load_state_dict(load_file(chemin_poids))
     return modele.to(device).eval()
 
 
@@ -104,7 +159,8 @@ def _construire_classifieur(device):
 # Cette fonction s'exécute UNE fois, au démarrage de l'API : elle charge les modèles.
 @app.on_event("startup")
 def load_all_models_and_assets():
-    global device, tokenizer, text_model, image_model, image_transform, cross_att_classifier
+    global device, tokenizer, text_model, image_model, image_transform
+    global cross_att_classifier, origine_modele
     try:
         # Les grosses bibliothèques sont importées ici, au moment où on en a besoin
         import torch
@@ -135,11 +191,12 @@ def load_all_models_and_assets():
         )
         image_model.eval()
 
-        # Classifieur à attention croisée, reconstruit et chargé depuis les
-        # poids portables locaux (plus de MLflow ni de S3)
-        cross_att_classifier = _construire_classifieur(device)
+        # Classifieur à attention croisée : les poids proviennent du modèle de
+        # production MLflow (alias "prod"), avec repli sur la copie locale.
+        chemin_poids, origine_modele = obtenir_poids()
+        cross_att_classifier = _construire_classifieur(device, chemin_poids)
 
-        print("All 3 models and processors loaded into memory successfully!")
+        print(f"Modèles chargés. Origine des poids : {origine_modele}")
     except Exception as e:
         # En cas d'erreur au chargement, on l'affiche et on interrompt le démarrage
         print(f"Erreur au démarrage : {str(e)}")
@@ -152,7 +209,26 @@ def load_all_models_and_assets():
 @app.get("/health")
 def health():
     models_ready = None not in (cross_att_classifier, text_model, image_model)
-    return {"status": "ok", "models_loaded": models_ready}
+    return {
+        "status": "ok",
+        "models_loaded": models_ready,
+        "origine_modele": origine_modele,
+    }
+
+
+# ROUTE DE RECHARGEMENT À CHAUD
+# Recharge le modèle de production depuis MLflow (avec repli local), sans redémarrer
+# l'API. À appeler après un réentraînement qui a promu un nouveau modèle en "prod".
+@app.post("/reload-model")
+def reload_model():
+    global cross_att_classifier, origine_modele
+    if device is None:
+        raise HTTPException(
+            status_code=503, detail="API en cours d'initialisation. Réessayer sous peu."
+        )
+    chemin_poids, origine_modele = obtenir_poids()
+    cross_att_classifier = _construire_classifieur(device, chemin_poids)
+    return {"status": "reloaded", "origine_modele": origine_modele}
 
 
 # CHAÎNES DE PRÉTRAITEMENT
