@@ -5,6 +5,9 @@
 ![Transformers](https://img.shields.io/badge/Transformers-FFD21E?style=for-the-badge&logo=huggingface&logoColor=black)
 ![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white)
 ![Gradio](https://img.shields.io/badge/Gradio-F97316?style=for-the-badge&logo=gradio&logoColor=white)
+![MLflow](https://img.shields.io/badge/MLflow-0194E2?style=for-the-badge&logo=mlflow&logoColor=white)
+![Azure](https://img.shields.io/badge/Azure-0078D4?style=for-the-badge&logo=microsoftazure&logoColor=white)
+![Kaggle](https://img.shields.io/badge/Kaggle-20BEFF?style=for-the-badge&logo=kaggle&logoColor=white)
 ![Evidently](https://img.shields.io/badge/Evidently-ED0400?style=for-the-badge)
 ![PostgreSQL](https://img.shields.io/badge/Neon%20Postgres-336791?style=for-the-badge&logo=postgresql&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)
@@ -20,31 +23,46 @@ Le besoin métier est traduit en un problème de classification binaire : pour u
 
 ## Architecture
 
-La solution est industrialisée selon une chaîne MLOps complète et autonome :
+La solution est industrialisée selon une chaîne MLOps complète, couvrant l'entraînement, le suivi des modèles, le service de prédiction, la surveillance et le réentraînement automatique.
 
-- Inférence : BioViL-T (public, licence MIT) et classifieur entraîné, chargé depuis des poids portables au format safetensors.
-- API : service FastAPI exposant les routes /health et /predict.
-- Application : interface Gradio déployée sur Hugging Face.
-- Entrepôt et datalake : PostgreSQL (Neon) et jeu de données Hugging Face.
-- Intégration et déploiement continus : GitHub Actions.
+- Modèle : BioViL-T (public, licence MIT) et classifieur à attention croisée entraîné, au format portable safetensors.
+- Suivi et registre de modèles : serveur MLflow hébergé sur Azure App Service, adossé à une base PostgreSQL (Neon) pour les métadonnées et à Azure Blob Storage pour les artefacts. Le registre versionne les modèles ; la version de production porte l'alias `prod`.
+- Entraînement : réalisé sur GPU via un notebook Kaggle, qui journalise l'expérience dans MLflow, enregistre le modèle au registre et le promeut en `prod` uniquement s'il améliore la perte de validation.
+- API : service FastAPI (routes `/health`, `/predict`, `/reload-model`), conteneurisé avec Docker et testé en intégration continue. Elle charge le modèle de production depuis MLflow, avec repli sur une copie locale si le serveur MLflow est momentanément indisponible.
+- Application : interface Gradio de démonstration, déployée sur Hugging Face, qui réalise l'inférence localement à partir du modèle embarqué.
+- Entrepôt et datalake : PostgreSQL (Neon) pour les prédictions de production ; Azure Blob Storage pour le datalake (embeddings de production et référence sémantique).
 - Monitoring : Evidently, détection de dérive sémantique sur les embeddings de texte.
+- Intégration et déploiement continus : GitHub Actions.
+
+## Boucle de réentraînement automatique
+
+Le cycle de vie du modèle est automatisé de bout en bout :
+
+1. L'application journalise ses prédictions et leurs embeddings dans le datalake Azure.
+2. Un workflow de monitoring planifié mesure la dérive sémantique avec Evidently.
+3. Au-delà d'un seuil de dérive, le monitoring émet un signal (`repository_dispatch`).
+4. Ce signal déclenche un workflow de réentraînement, qui relance l'entraînement sur Kaggle via son API.
+5. Le nouveau modèle est journalisé dans MLflow, enregistré au registre et promu en `prod` s'il est meilleur.
+6. L'API peut recharger le modèle de production à chaud, via sa route `/reload-model`.
+
+Le calcul GPU est déporté sur Kaggle, faute d'accès à un GPU sur le cloud de production. La structure de la chaîne reste identique à une architecture de référence ; seule la ressource de calcul diffère.
 
 ## Structure du dépôt
 
-- 1_exploration : analyses exploratoires.
-- 2_preparation_donnees : construction du jeu équilibré (paires cohérentes et incohérences calibrées).
-- 3_modelisation : entraînement du modèle et poids.
-- api : service FastAPI d'inférence.
-- app : application Gradio.
-- monitoring : surveillance de la dérive avec Evidently.
-- modele : poids du modèle.
-- docs : documentation.
-- .github : workflows d'intégration continue.
+- `1_exploration` : analyses exploratoires.
+- `2_preparation_donnees` : construction du jeu équilibré (paires cohérentes et incohérences calibrées).
+- `3_modelisation` : entraînement du modèle (`train.py`), inférence (`inference.py`) et notebook.
+- `api` : service FastAPI d'inférence, relié au registre MLflow.
+- `app` : application Gradio de démonstration.
+- `monitoring` : surveillance de la dérive avec Evidently et déclenchement du réentraînement.
+- `.github/workflows` : intégration continue, déploiement de l'application, monitoring planifié et réentraînement.
+
+Les poids du modèle ne sont pas versionnés dans le dépôt : ils sont gérés via le registre MLflow et distribués depuis le stockage des artefacts.
 
 ## Données
 
-Les données proviennent de CheXpert (radiographies thoraciques et comptes rendus dé-identifiés). Volumineuses et sensibles, elles ne sont pas versionnées dans ce dépôt et se téléchargent séparément depuis leurs sources d'origine.
+Les données proviennent de CheXpert (radiographies thoraciques et comptes rendus dé-identifiés). Volumineuses et sensibles, elles ne sont pas versionnées dans ce dépôt. Le jeu d'entraînement (un sous-ensemble équilibré de 20 000 paires) est hébergé comme jeu de données Kaggle, où s'exécute l'entraînement sur GPU.
 
 ## Stack technique
 
-Python, PyTorch, Transformers, BioViL-T, FastAPI, Gradio, safetensors, Evidently, PostgreSQL (Neon), Docker et GitHub Actions.
+Python, PyTorch, Transformers, BioViL-T, FastAPI, Gradio, safetensors, MLflow, Azure (App Service, Blob Storage), Kaggle, Evidently, PostgreSQL (Neon), Docker et GitHub Actions.
