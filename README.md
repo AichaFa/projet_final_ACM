@@ -17,6 +17,15 @@
 
 Ce projet vérifie automatiquement qu'un compte rendu radiologique correspond bien à sa radiographie thoracique. Le système reçoit une paire image-texte et estime la probabilité qu'ils décrivent le même examen, afin de signaler les associations incohérentes pour une revue humaine. Il ne pose pas de diagnostic : c'est un outil d'audit multimodal.
 
+## Démonstration et liens
+
+- Application en ligne : [Auditeur de Cohérence Médicale (Hugging Face)](https://huggingface.co/spaces/AichaFaHugFace/Auditeur-App-Gradio)
+- Suivi des expériences et registre de modèles : MLflow hébergé sur Azure App Service (serveur privé, non exposé publiquement).
+
+Démonstration vidéo (glisser la vidéo ici depuis l'éditeur GitHub) :
+
+<!-- Pour ajouter la vidéo : éditer ce README sur GitHub et déposer le fichier vidéo à cet emplacement. GitHub génère automatiquement un lecteur intégré. -->
+
 ## Approche
 
 Le besoin métier est traduit en un problème de classification binaire : pour une paire (image, texte), prédire cohérent (1) ou incohérent (0), avec un score de confiance. Le modèle repose sur BioViL-T, des encodeurs image et texte spécialisés pour la radiographie thoracique, surmontés d'un classifieur à attention croisée où le texte interroge les régions de l'image.

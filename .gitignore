@@ -41,3 +41,6 @@ preuves_soutenance/
 
 # Fichier utilitaire local (copie de cellule Kaggle), non versionne
 3_modelisation/cellule_secret_mlflow.py
+
+# Video de demonstration (integree directement dans le README sur GitHub)
+video demo/
