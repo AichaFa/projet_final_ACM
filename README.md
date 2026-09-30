@@ -144,6 +144,12 @@ Les données (images CheXpert, comptes rendus, étiquettes), les poids du modèl
 
 Les données proviennent de CheXpert (radiographies thoraciques et comptes rendus dé-identifiés). Volumineuses et sensibles, elles ne sont pas versionnées dans ce dépôt. Le jeu d'entraînement (un sous-ensemble équilibré de 20 000 paires) est hébergé comme jeu de données Kaggle, où s'exécute l'entraînement sur GPU.
 
+## Données et conformité
+
+Les données proviennent de CheXpert, un jeu de recherche public et dé-identifié (anonymisé), ce qui écarte le traitement de données personnelles directement identifiables. Elles ne sont pas versionnées dans ce dépôt et se téléchargent depuis leur source d'origine.
+
+Le serveur MLflow ne stocke que des métadonnées d'expériences (paramètres, métriques) et les poids du modèle, à l'exclusion de toute donnée patient. Les identifiants et secrets (accès cloud, jetons d'API) sont gérés hors du dépôt, au moyen de secrets de déploiement et de variables d'environnement.
+
 ## Stack technique
 
 Python, PyTorch, Transformers, BioViL-T, FastAPI, Gradio, safetensors, MLflow, Azure (App Service, Blob Storage), Kaggle, Evidently, PostgreSQL (Neon), Docker et GitHub Actions.
