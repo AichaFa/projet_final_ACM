@@ -47,3 +47,7 @@ video demo/
 
 # Fichiers temporaires Office
 ~$*
+
+# Documents de preparation personnels (hors livrable)
+presentation/Discours_oral_Auditeur.pdf
+presentation/Fiche_preparation_oral_Auditeur.pdf

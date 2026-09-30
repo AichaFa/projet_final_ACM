@@ -130,10 +130,8 @@ projet_final_ACM/
 │   ├── monitoring.yml                      (monitoring planifié quotidien)
 │   └── reentrainement.yml                  (réentraînement sur signal de dérive)
 │
-├── presentation/                           (documents de soutenance)
-│   ├── Presentation_Auditeur.pptx          (support de présentation)
-│   ├── Discours_oral_Auditeur.pdf          (discours minuté)
-│   └── Fiche_preparation_oral_Auditeur.pdf (fiche de préparation)
+├── presentation/                           (support de soutenance)
+│   └── Presentation_Auditeur.pptx          (support de présentation)
 │
 ├── .gitignore
 └── README.md
