@@ -44,3 +44,6 @@ preuves_soutenance/
 
 # Video de demonstration (integree directement dans le README sur GitHub)
 video demo/
+
+# Fichiers temporaires Office
+~$*

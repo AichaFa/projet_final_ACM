@@ -56,17 +56,85 @@ Le cycle de vie du modèle est automatisé de bout en bout :
 
 Le calcul GPU est déporté sur Kaggle, faute d'accès à un GPU sur le cloud de production. La structure de la chaîne reste identique à une architecture de référence ; seule la ressource de calcul diffère.
 
-## Structure du dépôt
+## Organisation des fichiers
 
-- `1_exploration` : analyses exploratoires.
-- `2_preparation_donnees` : construction du jeu équilibré (paires cohérentes et incohérences calibrées).
-- `3_modelisation` : entraînement du modèle (`train.py`), inférence (`inference.py`) et notebook.
-- `api` : service FastAPI d'inférence, relié au registre MLflow.
-- `app` : application Gradio de démonstration.
-- `monitoring` : surveillance de la dérive avec Evidently et déclenchement du réentraînement.
-- `.github/workflows` : intégration continue, déploiement de l'application, monitoring planifié et réentraînement.
+Le projet est organisé en dossiers numérotés suivant les étapes du pipeline, des données brutes jusqu'à la solution industrialisée.
 
-Les poids du modèle ne sont pas versionnés dans le dépôt : ils sont gérés via le registre MLflow et distribués depuis le stockage des artefacts.
+```
+projet_final_ACM/
+├── 1_exploration/                          (analyses exploratoires, non officielles)
+│   ├── 00 - EDA.ipynb
+│   ├── 01_dataset_matching_image_report.ipynb
+│   ├── analyse_json_csv.ipynb
+│   ├── create_sample.ipynb
+│   └── prepa_csv_image_json.ipynb
+│
+├── 2_preparation_donnees/                  (construction du jeu équilibré)
+│   ├── create_dataset_sample.ipynb
+│   ├── chexpert_matches_sample_2.csv
+│   ├── chexpert_mismatches_swapping_2.csv
+│   └── chexpert_mismatches_swap_cluster.csv
+│
+├── 3_modelisation/                         (entraînement, inférence, notebooks)
+│   ├── train.py                            (entraînement + registre + promotion MLflow)
+│   ├── inference.py                        (cœur d'inférence BioViL-T)
+│   ├── models_biovil_t.ipynb               (modélisation BioViL-T retenue)
+│   ├── models_biomed_clip.ipynb            (modélisation BiomedCLIP, comparaison)
+│   ├── test_inference.ipynb
+│   ├── Kaggle_notebook033e66b2c2.ipynb     (notebook d'entraînement Kaggle)
+│   └── anciennes_versions/                 (itérations antérieures, trace de la démarche)
+│       ├── create_pos_neg.ipynb
+│       ├── models_1_biomed_log_reg_mlp.ipynb
+│       ├── models_2_biomed_cross_attention.ipynb
+│       ├── models_3_biomed_lora.ipynb
+│       ├── models_4_biovil_cross_attention.ipynb
+│       ├── models_biomed_clip_old.ipynb
+│       ├── models_biovil_t_old.ipynb
+│       └── Guide_explicatif_du_code_Final.pdf
+│
+├── api/                                    (service d'inférence FastAPI)
+│   ├── src/
+│   │   └── radio_check_app.py              (API, chargement du modèle prod MLflow)
+│   ├── tests/
+│   │   ├── test_api.py
+│   │   └── test_predict.py
+│   ├── Dockerfile
+│   ├── conftest.py
+│   └── requirements.txt
+│
+├── app/                                    (application Gradio de démonstration)
+│   ├── app.py                              (interface et inférence embarquée)
+│   ├── inference.py
+│   ├── datalake_azure.py                   (journalisation vers le datalake Azure)
+│   ├── tests/
+│   │   └── test_app.py
+│   ├── requirements.txt
+│   └── README.md
+│
+├── monitoring/                             (surveillance de dérive et déclenchement)
+│   ├── monitoring.py                       (dérive Evidently + signal de réentraînement)
+│   ├── embeddings.py                       (calcul des embeddings BioViL-T)
+│   ├── construire_reference.py             (référence sémantique)
+│   ├── journalisation.py
+│   ├── datalake_azure.py
+│   ├── orchestrateur.py
+│   └── requirements.txt
+│
+├── modele/                                 (documentation du modèle, poids gérés via MLflow)
+│   └── README.md
+│
+├── .github/workflows/                      (intégration continue et automatisation)
+│   ├── ci-api.yml                          (tests de l'API)
+│   ├── ci-app.yml                          (tests de l'application)
+│   ├── deploy-app.yml                      (déploiement de l'application)
+│   ├── monitoring.yml                      (monitoring planifié quotidien)
+│   └── reentrainement.yml                  (réentraînement sur signal de dérive)
+│
+├── .gitignore
+└── README.md
+```
+
+Les données (images CheXpert, comptes rendus, étiquettes), les poids du modèle, le cache de caractéristiques et les fichiers de secrets ne sont pas versionnés : ils sont exclus du dépôt via `.gitignore`. Les poids sont gérés par le registre MLflow, et les données se téléchargent depuis leurs sources d'origine.
 
 ## Données
 
