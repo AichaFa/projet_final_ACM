@@ -31,6 +31,7 @@ https://github.com/user-attachments/assets/98fc7a8c-cfca-4345-96da-5cddeaeffac5
 Le besoin métier est traduit en un problème de classification binaire : pour une paire (image, texte), prédire cohérent (1) ou incohérent (0), avec un score de confiance. Le modèle repose sur BioViL-T, des encodeurs image et texte spécialisés pour la radiographie thoracique, surmontés d'un classifieur à attention croisée où le texte interroge les régions de l'image.
 
 ## Architecture
+<img width="2089" height="1289" alt="architecture_auditeur" src="https://github.com/user-attachments/assets/54956cd0-3c18-4377-9a51-21a869402221" />
 
 La solution est industrialisée selon une chaîne MLOps complète, couvrant l'entraînement, le suivi des modèles, le service de prédiction, la surveillance et le réentraînement automatique.
 
