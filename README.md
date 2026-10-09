@@ -21,6 +21,7 @@ Ce projet vérifie automatiquement qu'un compte rendu radiologique correspond bi
 
 - Application en ligne : [Auditeur de Cohérence Médicale (Hugging Face)](https://huggingface.co/spaces/AichaFaHugFace/Auditeur-App-Gradio)
 - Suivi des expériences et registre de modèles : MLflow hébergé sur Azure App Service (serveur privé, non exposé publiquement).
+- Déploiement du serveur de suivi : le code d'hébergement du serveur MLflow (Azure App Service) est disponible dans le dépôt [serveur-mlflow](https://github.com/AichaFa/serveur-mlflow).
 
 Démonstration vidéo (glisser la vidéo ici depuis l'éditeur GitHub) :
 
